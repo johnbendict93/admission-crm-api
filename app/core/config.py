@@ -18,6 +18,16 @@ class Settings(BaseSettings):
     PROD_SUPABASE_URL: str
     PROD_SUPABASE_KEY: str
 
+    # Direct Postgres connection strings (Supabase dashboard -> Connect ->
+    # Connection string -> URI), used ONLY by migrations/run_migrations.py.
+    # DDL (CREATE TABLE/ALTER TABLE/etc.) can't go through PostgREST, so the
+    # migration runner needs a direct connection distinct from SUPABASE_URL/
+    # SUPABASE_KEY above, which the app itself uses for ordinary CRUD. Both
+    # default to "" so the app can still boot without them; only the
+    # migration runner requires whichever one it's pointed at.
+    DEV_DATABASE_URL: str = ""
+    PROD_DATABASE_URL: str = ""
+
     API_KEY: str  # shared-secret auth for all business endpoints (see app/core/security.py)
     GROQ_API_KEY: str = ""
     COLLEGE_SHORT: str = "DCE"
