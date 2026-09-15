@@ -1,0 +1,38 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    # Every credential here comes from GitHub Actions secrets — nothing
+    # real is hardcoded in this file. ENVIRONMENT is pinned to
+    # "development" and PROD_SUPABASE_URL/KEY are inert placeholders
+    # (never real secrets): this CI job never possesses production
+    # credentials at all, so there is no code path — buggy config or
+    # otherwise — through which it could reach production.
+    env:
+      ENVIRONMENT: development
+      DEV_SUPABASE_URL: ${{ secrets.DEV_SUPABASE_URL }}
+      DEV_SUPABASE_KEY: ${{ secrets.DEV_SUPABASE_KEY }}
+      API_KEY: ${{ secrets.API_KEY }}
+      PROD_SUPABASE_URL: "https://ci-placeholder.supabase.co"
+      PROD_SUPABASE_KEY: "ci-placeholder-unused"
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run test suite against the dev database
+        run: pytest -v
