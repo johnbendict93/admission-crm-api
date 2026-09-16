@@ -1,0 +1,11 @@
+# Force LF for migration SQL and the migration runner itself, regardless of
+# a contributor's local core.autocrlf setting. Without this, a plain
+# `git checkout` on Windows can silently rewrite these files from LF to
+# CRLF, which changes their exact bytes without changing their content —
+# and this project's migration checksums (run_migrations.py, added for
+# drift detection) hash exact file bytes. Confirmed live (Sept 2026):
+# tampering with 0003_add_soft_delete_columns.sql was correctly detected,
+# but reverting it via `git checkout --` on Windows still failed a
+# checksum check afterward, purely from LF->CRLF conversion on checkout.
+*.sql text eol=lf
+migrations/run_migrations.py text eol=lf
