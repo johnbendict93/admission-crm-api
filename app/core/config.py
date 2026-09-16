@@ -51,6 +51,7 @@ class Settings(BaseSettings):
     FEE_PAYMENTS_TABLE: str = "fee_payments"
     SCHOLARSHIPS_TABLE: str = "scholarships"
     HOSTEL_ALLOTMENTS_TABLE: str = "hostel_allotments"
+    TELECALLERS_TABLE: str = "telecallers"
     USERS_TABLE: str = "users"
 
     @property

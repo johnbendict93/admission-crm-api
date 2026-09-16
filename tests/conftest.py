@@ -152,6 +152,11 @@ def hostel_allotments_table():
     return settings.HOSTEL_ALLOTMENTS_TABLE
 
 
+@pytest.fixture(scope="session")
+def telecallers_table():
+    return settings.TELECALLERS_TABLE
+
+
 def count_rows(supabase, table_name: str) -> int:
     response = supabase.table(table_name).select("id").execute()
     return len(response.data)
@@ -166,9 +171,10 @@ def verify_db_untouched(
     fee_payments_table,
     scholarships_table,
     hostel_allotments_table,
+    telecallers_table,
 ):
     """Runs around every single test. Whatever a test does — including its
-    own try/finally cleanup of any row it created — the six tables must
+    own try/finally cleanup of any row it created — the seven tables must
     have exactly the same row counts after the test as before it. This is
     the automated version of the manual "check row count before/after"
     step done for every prior live verification in this project.
@@ -180,6 +186,7 @@ def verify_db_untouched(
         fee_payments_table,
         scholarships_table,
         hostel_allotments_table,
+        telecallers_table,
     ]
     before = {t: count_rows(supabase, t) for t in tables}
     yield
