@@ -40,15 +40,59 @@ def pytest_configure(config):
         )
 
 
+def _login(email: str, password: str, role_label: str) -> str:
+    """Logs in via the real /auth/login endpoint (real Supabase Auth call,
+    not mocked) and returns the access token. Used to build the
+    session-scoped fixtures below so we only log in once per test run per
+    role, not once per test."""
+    if not email or not password:
+        pytest.exit(
+            f"TEST_{role_label.upper()}_EMAIL/PASSWORD not set in .env. Run "
+            "scripts/create_test_users.py once against dev, then add the "
+            "printed credentials to .env.",
+            returncode=1,
+        )
+    login_client = TestClient(app)
+    response = login_client.post("/auth/login", json={"email": email, "password": password})
+    assert response.status_code == 200, f"Test {role_label} login failed: {response.text}"
+    return response.json()["access_token"]
+
+
 @pytest.fixture(scope="session")
-def client():
+def admin_access_token():
+    """A real Supabase-issued JWT for the dedicated admin-role test
+    account (see scripts/create_test_users.py)."""
+    return _login(settings.TEST_ADMIN_EMAIL, settings.TEST_ADMIN_PASSWORD, "admin")
+
+
+@pytest.fixture(scope="session")
+def viewer_access_token():
+    """A real Supabase-issued JWT for the dedicated viewer-role test
+    account (see scripts/create_test_users.py)."""
+    return _login(settings.TEST_VIEWER_EMAIL, settings.TEST_VIEWER_PASSWORD, "viewer")
+
+
+@pytest.fixture(scope="session")
+def client(admin_access_token):
     """FastAPI TestClient — talks to the app in-process, over the real
     Supabase connection configured in .env (no mocking of the DB layer).
-    Sends the real API key by default so every existing test keeps working
-    now that the business routers require it; auth-specific tests
-    (tests/test_auth.py) override/omit the header explicitly."""
+    Sends a real admin-role JWT by default so every existing CRUD test
+    keeps working unchanged (admin passes every role check); auth- and
+    role-specific tests (tests/test_auth.py) override/omit the header
+    explicitly, and tests that need viewer-role restrictions use the
+    separate `viewer_client` fixture below instead."""
     test_client = TestClient(app)
-    test_client.headers.update({"X-API-Key": settings.API_KEY})
+    test_client.headers.update({"Authorization": f"Bearer {admin_access_token}"})
+    return test_client
+
+
+@pytest.fixture(scope="session")
+def viewer_client(viewer_access_token):
+    """Same as `client`, but authenticated as the viewer-role test
+    account — for asserting the read-only restriction (403 on
+    POST/PATCH/DELETE, 200 on GET)."""
+    test_client = TestClient(app)
+    test_client.headers.update({"Authorization": f"Bearer {viewer_access_token}"})
     return test_client
 
 

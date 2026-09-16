@@ -18,6 +18,14 @@ class Settings(BaseSettings):
     PROD_SUPABASE_URL: str
     PROD_SUPABASE_KEY: str
 
+    # anon (public) keys - safe to be non-secret, unlike SUPABASE_KEY above
+    # (which is the service_role key). Used ONLY for the login endpoint's
+    # sign_in_with_password() call (see app/routers/auth.py) - the correct,
+    # minimal-privilege key for a client-facing auth call, as opposed to the
+    # service_role key the rest of the app uses for ordinary CRUD.
+    DEV_SUPABASE_ANON_KEY: str = ""
+    PROD_SUPABASE_ANON_KEY: str = ""
+
     # Direct Postgres connection strings (Supabase dashboard -> Connect ->
     # Connection string -> URI), used ONLY by migrations/run_migrations.py.
     # DDL (CREATE TABLE/ALTER TABLE/etc.) can't go through PostgREST, so the
@@ -28,7 +36,10 @@ class Settings(BaseSettings):
     DEV_DATABASE_URL: str = ""
     PROD_DATABASE_URL: str = ""
 
-    API_KEY: str  # shared-secret auth for all business endpoints (see app/core/security.py)
+    TEST_ADMIN_EMAIL: str = ""
+    TEST_ADMIN_PASSWORD: str = ""
+    TEST_VIEWER_EMAIL: str = ""
+    TEST_VIEWER_PASSWORD: str = ""
     GROQ_API_KEY: str = ""
     COLLEGE_SHORT: str = "DCE"
 
@@ -37,6 +48,7 @@ class Settings(BaseSettings):
     LEADS_TABLE: str = "leads"
     APPLICANTS_TABLE: str = "applicants"
     APPLICATIONS_TABLE: str = "applications"
+    USERS_TABLE: str = "users"
 
     @property
     def SUPABASE_URL(self) -> str:
@@ -45,6 +57,10 @@ class Settings(BaseSettings):
     @property
     def SUPABASE_KEY(self) -> str:
         return self.PROD_SUPABASE_KEY if self.ENVIRONMENT == "production" else self.DEV_SUPABASE_KEY
+
+    @property
+    def SUPABASE_ANON_KEY(self) -> str:
+        return self.PROD_SUPABASE_ANON_KEY if self.ENVIRONMENT == "production" else self.DEV_SUPABASE_ANON_KEY
 
     @property
     def allowed_origins_list(self) -> list[str]:

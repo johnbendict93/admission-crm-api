@@ -5,11 +5,11 @@ from postgrest.exceptions import APIError
 from supabase import Client
 
 from app.core.database import get_supabase_client
-from app.core.security import verify_api_key
+from app.core.jwt_auth import get_current_user, require_deleter, require_writer
 from app.models.applicants import ApplicantCreate, ApplicantResponse, ApplicantUpdate
 from app.services import applicants_service
 
-router = APIRouter(prefix="/applicants", tags=["Applicants"], dependencies=[Depends(verify_api_key)])
+router = APIRouter(prefix="/applicants", tags=["Applicants"])
 
 
 @router.get("/", response_model=List[ApplicantResponse])
@@ -17,6 +17,7 @@ def list_applicants(
     limit: int = Query(50, ge=1, le=200, description="Rows per page (max 200)"),
     offset: int = Query(0, ge=0),
     supabase: Client = Depends(get_supabase_client),
+    current_user: dict = Depends(get_current_user),
 ):
     try:
         return applicants_service.get_all_applicants(supabase, limit=limit, offset=offset)
@@ -25,7 +26,11 @@ def list_applicants(
 
 
 @router.get("/{applicant_id}", response_model=ApplicantResponse)
-def get_applicant(applicant_id: str, supabase: Client = Depends(get_supabase_client)):
+def get_applicant(
+    applicant_id: str,
+    supabase: Client = Depends(get_supabase_client),
+    current_user: dict = Depends(get_current_user),
+):
     try:
         applicant = applicants_service.get_applicant_by_id(supabase, applicant_id)
     except APIError as e:
@@ -36,7 +41,11 @@ def get_applicant(applicant_id: str, supabase: Client = Depends(get_supabase_cli
 
 
 @router.post("/", response_model=ApplicantResponse, status_code=201)
-def create_applicant(applicant: ApplicantCreate, supabase: Client = Depends(get_supabase_client)):
+def create_applicant(
+    applicant: ApplicantCreate,
+    supabase: Client = Depends(get_supabase_client),
+    current_user: dict = Depends(require_writer),
+):
     try:
         created = applicants_service.create_applicant(supabase, applicant)
     except APIError as e:
@@ -47,7 +56,12 @@ def create_applicant(applicant: ApplicantCreate, supabase: Client = Depends(get_
 
 
 @router.patch("/{applicant_id}", response_model=ApplicantResponse)
-def update_applicant(applicant_id: str, applicant: ApplicantUpdate, supabase: Client = Depends(get_supabase_client)):
+def update_applicant(
+    applicant_id: str,
+    applicant: ApplicantUpdate,
+    supabase: Client = Depends(get_supabase_client),
+    current_user: dict = Depends(require_writer),
+):
     payload = applicant.model_dump(exclude_unset=True, mode="json")
     if not payload:
         raise HTTPException(status_code=400, detail="No fields provided to update")
@@ -61,7 +75,11 @@ def update_applicant(applicant_id: str, applicant: ApplicantUpdate, supabase: Cl
 
 
 @router.delete("/{applicant_id}", status_code=204)
-def delete_applicant(applicant_id: str, supabase: Client = Depends(get_supabase_client)):
+def delete_applicant(
+    applicant_id: str,
+    supabase: Client = Depends(get_supabase_client),
+    current_user: dict = Depends(require_deleter),
+):
     try:
         deleted = applicants_service.delete_applicant(supabase, applicant_id)
     except APIError as e:
