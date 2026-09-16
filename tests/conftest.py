@@ -137,20 +137,25 @@ def applications_table():
     return settings.APPLICATIONS_TABLE
 
 
+@pytest.fixture(scope="session")
+def fee_payments_table():
+    return settings.FEE_PAYMENTS_TABLE
+
+
 def count_rows(supabase, table_name: str) -> int:
     response = supabase.table(table_name).select("id").execute()
     return len(response.data)
 
 
 @pytest.fixture(autouse=True)
-def verify_db_untouched(supabase, leads_table, applicants_table, applications_table):
+def verify_db_untouched(supabase, leads_table, applicants_table, applications_table, fee_payments_table):
     """Runs around every single test. Whatever a test does — including its
-    own try/finally cleanup of any row it created — the three tables must
+    own try/finally cleanup of any row it created — the four tables must
     have exactly the same row counts after the test as before it. This is
     the automated version of the manual "check row count before/after"
     step done for every prior live verification in this project.
     """
-    tables = [leads_table, applicants_table, applications_table]
+    tables = [leads_table, applicants_table, applications_table, fee_payments_table]
     before = {t: count_rows(supabase, t) for t in tables}
     yield
     after = {t: count_rows(supabase, t) for t in tables}

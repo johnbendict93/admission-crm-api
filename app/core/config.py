@@ -48,6 +48,7 @@ class Settings(BaseSettings):
     LEADS_TABLE: str = "leads"
     APPLICANTS_TABLE: str = "applicants"
     APPLICATIONS_TABLE: str = "applications"
+    FEE_PAYMENTS_TABLE: str = "fee_payments"
     USERS_TABLE: str = "users"
 
     @property
