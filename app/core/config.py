@@ -52,6 +52,8 @@ class Settings(BaseSettings):
     SCHOLARSHIPS_TABLE: str = "scholarships"
     HOSTEL_ALLOTMENTS_TABLE: str = "hostel_allotments"
     TELECALLERS_TABLE: str = "telecallers"
+    DOCUMENT_TYPES_TABLE: str = "document_types"
+    LOOKUP_VALUES_TABLE: str = "lookup_values"
     USERS_TABLE: str = "users"
 
     @property

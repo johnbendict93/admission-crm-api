@@ -5,7 +5,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import settings
-from app.routers import applicants, applications, auth, fee_payments, hostel_allotments, leads, scholarships, telecallers
+from app.routers import (
+    applicants,
+    applications,
+    auth,
+    document_types,
+    fee_payments,
+    hostel_allotments,
+    leads,
+    lookup_values,
+    scholarships,
+    telecallers,
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -41,6 +52,8 @@ app.include_router(fee_payments.router)
 app.include_router(scholarships.router)
 app.include_router(hostel_allotments.router)
 app.include_router(telecallers.router)
+app.include_router(document_types.router)
+app.include_router(lookup_values.router)
 
 
 @app.get("/health")
