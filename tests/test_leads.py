@@ -100,7 +100,7 @@ class TestUpdateLead:
 
 
 class TestDeleteLead:
-    def test_delete_existing_lead_returns_204(self, client, supabase, leads_table):
+    def test_delete_existing_lead_returns_204(self, client, supabase, leads_table, admin_user_id):
         insert_response = (
             supabase.table(leads_table)
             .insert({"name": "Pytest Delete Lead", "phone": "9999900002", "status": "New"})
@@ -112,11 +112,47 @@ class TestDeleteLead:
             assert response.status_code == 204
             follow_up = client.get(f"/leads/{lead_id}")
             assert follow_up.status_code == 404
+
+            # Soft delete, not hard delete: the row must still physically
+            # exist (with deleted_at/deleted_by set), even though the API
+            # now treats it as gone. select() bypasses the API's own
+            # deleted_at filter, so this can see the row the GET above
+            # correctly could not.
+            row = (
+                supabase.table(leads_table)
+                .select("id,deleted_at,deleted_by")
+                .eq("id", lead_id)
+                .single()
+                .execute()
+            ).data
+            assert row is not None, "row was hard-deleted, not soft-deleted"
+            assert row["deleted_at"] is not None
+            assert row["deleted_by"] == admin_user_id
         finally:
             # Defensive cleanup in case an assertion above failed before
-            # the delete actually went through.
+            # the delete actually went through — hard-deletes regardless
+            # of deleted_at, so this always fully removes the test row.
             supabase.table(leads_table).delete().eq("id", lead_id).execute()
 
     def test_delete_nonexistent_lead_returns_404(self, client):
         response = client.delete("/leads/00000000-0000-0000-0000-000000000000")
         assert response.status_code == 404
+
+    def test_delete_already_deleted_lead_returns_404(self, client, supabase, leads_table):
+        # Soft delete must not be re-appliable: once deleted_at is set, a
+        # second DELETE on the same id has nothing left to match (the
+        # service's .is_("deleted_at", "null") guard) and must 404, not
+        # silently "succeed" again.
+        insert_response = (
+            supabase.table(leads_table)
+            .insert({"name": "Pytest Double Delete Lead", "phone": "9999900006", "status": "New"})
+            .execute()
+        )
+        lead_id = insert_response.data[0]["id"]
+        try:
+            first = client.delete(f"/leads/{lead_id}")
+            assert first.status_code == 204
+            second = client.delete(f"/leads/{lead_id}")
+            assert second.status_code == 404
+        finally:
+            supabase.table(leads_table).delete().eq("id", lead_id).execute()

@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timezone
 
 from postgrest.exceptions import APIError
 from supabase import Client
@@ -31,6 +32,7 @@ def get_all_applicants(supabase: Client, limit: int = 50, offset: int = 0):
         response = (
             supabase.table(TABLE_NAME)
             .select(APPLICANT_COLUMNS)
+            .is_("deleted_at", "null")  # soft-deleted rows excluded by default
             .order("created_at", desc=True)
             .order("id")  # tiebreaker: seeded rows share identical created_at,
             # so pagination needs a secondary key for stable, deterministic order
@@ -49,6 +51,7 @@ def get_applicant_by_id(supabase: Client, applicant_id: str):
             supabase.table(TABLE_NAME)
             .select(APPLICANT_COLUMNS)
             .eq("id", applicant_id)
+            .is_("deleted_at", "null")  # soft-deleted rows excluded by default
             .maybe_single()
             .execute()
         )
@@ -58,8 +61,13 @@ def get_applicant_by_id(supabase: Client, applicant_id: str):
     return response.data if response else None
 
 
-def create_applicant(supabase: Client, applicant: ApplicantCreate):
+def create_applicant(supabase: Client, applicant: ApplicantCreate, created_by: str):
+    """created_by is always set from the authenticated caller (see
+    require_writer in the router), never trusted from the request body -
+    otherwise a client could attribute a record to any user id it likes,
+    which defeats the point of an audit trail."""
     payload = applicant.model_dump(exclude_none=True, mode="json")
+    payload["created_by"] = created_by
     try:
         response = supabase.table(TABLE_NAME).insert(payload).execute()
     except APIError as e:
@@ -82,9 +90,18 @@ def update_applicant(supabase: Client, applicant_id: str, payload: dict):
     return response.data[0] if response.data else None
 
 
-def delete_applicant(supabase: Client, applicant_id: str) -> bool:
+def delete_applicant(supabase: Client, applicant_id: str, deleted_by: str) -> bool:
+    """Soft delete - see leads_service.delete_lead for the full rationale.
+    Same double-delete guard: already-deleted or nonexistent both come
+    back as zero affected rows, which the router reports as 404."""
     try:
-        response = supabase.table(TABLE_NAME).delete().eq("id", applicant_id).execute()
+        response = (
+            supabase.table(TABLE_NAME)
+            .update({"deleted_at": datetime.now(timezone.utc).isoformat(), "deleted_by": deleted_by})
+            .eq("id", applicant_id)
+            .is_("deleted_at", "null")
+            .execute()
+        )
     except APIError as e:
         logger.error("Supabase error in delete_applicant: %s", e)
         raise

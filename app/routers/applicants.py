@@ -47,7 +47,7 @@ def create_applicant(
     current_user: dict = Depends(require_writer),
 ):
     try:
-        created = applicants_service.create_applicant(supabase, applicant)
+        created = applicants_service.create_applicant(supabase, applicant, created_by=current_user["id"])
     except APIError as e:
         raise HTTPException(status_code=400, detail=f"Database error: {e.message}")
     if not created:
@@ -81,7 +81,7 @@ def delete_applicant(
     current_user: dict = Depends(require_deleter),
 ):
     try:
-        deleted = applicants_service.delete_applicant(supabase, applicant_id)
+        deleted = applicants_service.delete_applicant(supabase, applicant_id, deleted_by=current_user["id"])
     except APIError as e:
         raise HTTPException(status_code=400, detail=f"Database error: {e.message}")
     if not deleted:

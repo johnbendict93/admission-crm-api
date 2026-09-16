@@ -100,12 +100,18 @@ class TestRoleBasedAccess:
     def test_admin_can_delete(self, client, supabase, leads_table):
         # Prove the flip side of the viewer restriction: admin's DELETE
         # actually reaches the service layer (create-then-delete so the
-        # DB-untouched fixture still balances).
+        # DB-untouched fixture still balances). DELETE is now a soft
+        # delete (see migrations/0003_add_soft_delete_columns.sql) — the
+        # row survives with deleted_at set, so it still needs an explicit
+        # hard-delete cleanup here, unlike when DELETE itself removed it.
         created = (
             supabase.table(leads_table)
             .insert({"name": "Role Test Delete", "phone": "8888888888"})
             .execute()
         )
         lead_id = created.data[0]["id"]
-        response = client.delete(f"/leads/{lead_id}")
-        assert response.status_code == 204
+        try:
+            response = client.delete(f"/leads/{lead_id}")
+            assert response.status_code == 204
+        finally:
+            supabase.table(leads_table).delete().eq("id", lead_id).execute()

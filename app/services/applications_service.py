@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timezone
 
 from postgrest.exceptions import APIError
 from supabase import Client
@@ -26,6 +27,7 @@ def get_all_applications(supabase: Client, limit: int = 50, offset: int = 0):
         response = (
             supabase.table(TABLE_NAME)
             .select(APPLICATION_COLUMNS)
+            .is_("deleted_at", "null")  # soft-deleted rows excluded by default
             .order("created_at", desc=True)
             .order("id")  # tiebreaker: seeded rows share identical created_at,
             # so pagination needs a secondary key for stable, deterministic order
@@ -44,6 +46,7 @@ def get_application_by_id(supabase: Client, application_id: str):
             supabase.table(TABLE_NAME)
             .select(APPLICATION_COLUMNS)
             .eq("id", application_id)
+            .is_("deleted_at", "null")  # soft-deleted rows excluded by default
             .maybe_single()
             .execute()
         )
@@ -77,9 +80,18 @@ def update_application(supabase: Client, application_id: str, payload: dict):
     return response.data[0] if response.data else None
 
 
-def delete_application(supabase: Client, application_id: str) -> bool:
+def delete_application(supabase: Client, application_id: str, deleted_by: str) -> bool:
+    """Soft delete - see leads_service.delete_lead for the full rationale.
+    Same double-delete guard: already-deleted or nonexistent both come
+    back as zero affected rows, which the router reports as 404."""
     try:
-        response = supabase.table(TABLE_NAME).delete().eq("id", application_id).execute()
+        response = (
+            supabase.table(TABLE_NAME)
+            .update({"deleted_at": datetime.now(timezone.utc).isoformat(), "deleted_by": deleted_by})
+            .eq("id", application_id)
+            .is_("deleted_at", "null")
+            .execute()
+        )
     except APIError as e:
         logger.error("Supabase error in delete_application: %s", e)
         raise

@@ -81,7 +81,7 @@ def delete_lead(
     current_user: dict = Depends(require_deleter),
 ):
     try:
-        deleted = leads_service.delete_lead(supabase, lead_id)
+        deleted = leads_service.delete_lead(supabase, lead_id, deleted_by=current_user["id"])
     except APIError as e:
         raise HTTPException(status_code=400, detail=f"Database error: {e.message}")
     if not deleted:

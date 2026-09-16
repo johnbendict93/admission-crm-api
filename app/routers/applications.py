@@ -81,7 +81,7 @@ def delete_application(
     current_user: dict = Depends(require_deleter),
 ):
     try:
-        deleted = applications_service.delete_application(supabase, application_id)
+        deleted = applications_service.delete_application(supabase, application_id, deleted_by=current_user["id"])
     except APIError as e:
         raise HTTPException(status_code=400, detail=f"Database error: {e.message}")
     if not deleted:

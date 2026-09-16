@@ -40,11 +40,11 @@ def pytest_configure(config):
         )
 
 
-def _login(email: str, password: str, role_label: str) -> str:
+def _login(email: str, password: str, role_label: str) -> dict:
     """Logs in via the real /auth/login endpoint (real Supabase Auth call,
-    not mocked) and returns the access token. Used to build the
-    session-scoped fixtures below so we only log in once per test run per
-    role, not once per test."""
+    not mocked) and returns the full response body (access_token + user).
+    Used to build the session-scoped fixtures below so we only log in once
+    per test run per role, not once per test."""
     if not email or not password:
         pytest.exit(
             f"TEST_{role_label.upper()}_EMAIL/PASSWORD not set in .env. Run "
@@ -55,21 +55,39 @@ def _login(email: str, password: str, role_label: str) -> str:
     login_client = TestClient(app)
     response = login_client.post("/auth/login", json={"email": email, "password": password})
     assert response.status_code == 200, f"Test {role_label} login failed: {response.text}"
-    return response.json()["access_token"]
+    return response.json()
 
 
 @pytest.fixture(scope="session")
-def admin_access_token():
-    """A real Supabase-issued JWT for the dedicated admin-role test
-    account (see scripts/create_test_users.py)."""
+def _admin_login():
     return _login(settings.TEST_ADMIN_EMAIL, settings.TEST_ADMIN_PASSWORD, "admin")
 
 
 @pytest.fixture(scope="session")
-def viewer_access_token():
+def _viewer_login():
+    return _login(settings.TEST_VIEWER_EMAIL, settings.TEST_VIEWER_PASSWORD, "viewer")
+
+
+@pytest.fixture(scope="session")
+def admin_access_token(_admin_login):
+    """A real Supabase-issued JWT for the dedicated admin-role test
+    account (see scripts/create_test_users.py)."""
+    return _admin_login["access_token"]
+
+
+@pytest.fixture(scope="session")
+def admin_user_id(_admin_login):
+    """The admin test account's own users.id row - for asserting
+    soft-delete/audit-trail fields (deleted_by, created_by) come back set
+    to the account that actually performed the request."""
+    return _admin_login["user"]["id"]
+
+
+@pytest.fixture(scope="session")
+def viewer_access_token(_viewer_login):
     """A real Supabase-issued JWT for the dedicated viewer-role test
     account (see scripts/create_test_users.py)."""
-    return _login(settings.TEST_VIEWER_EMAIL, settings.TEST_VIEWER_PASSWORD, "viewer")
+    return _viewer_login["access_token"]
 
 
 @pytest.fixture(scope="session")
@@ -146,7 +164,7 @@ def verify_db_untouched(supabase, leads_table, applicants_table, applications_ta
 def existing_lead(supabase, leads_table):
     """A real, pre-existing lead id (never created or deleted by the
     tests) — used for GET /{id} happy-path checks."""
-    response = supabase.table(leads_table).select("id").limit(1).execute()
+    response = supabase.table(leads_table).select("id").is_("deleted_at", "null").limit(1).execute()
     assert response.data, "No existing leads found — seed data expected in 'leads'"
     return response.data[0]["id"]
 
@@ -155,7 +173,7 @@ def existing_lead(supabase, leads_table):
 def existing_applicant(supabase, applicants_table):
     """A real, pre-existing applicant id — used for GET /{id} checks and
     as the FK target when creating a test application."""
-    response = supabase.table(applicants_table).select("id").limit(1).execute()
+    response = supabase.table(applicants_table).select("id").is_("deleted_at", "null").limit(1).execute()
     assert response.data, "No existing applicants found — seed data expected in 'applicants'"
     return response.data[0]["id"]
 
@@ -163,6 +181,6 @@ def existing_applicant(supabase, applicants_table):
 @pytest.fixture
 def existing_application(supabase, applications_table):
     """A real, pre-existing application id — used for GET /{id) checks."""
-    response = supabase.table(applications_table).select("id").limit(1).execute()
+    response = supabase.table(applications_table).select("id").is_("deleted_at", "null").limit(1).execute()
     assert response.data, "No existing applications found — seed data expected in 'applications'"
     return response.data[0]["id"]

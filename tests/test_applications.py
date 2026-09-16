@@ -136,7 +136,7 @@ class TestUpdateApplication:
 
 class TestDeleteApplication:
     def test_delete_existing_application_returns_204(
-        self, client, supabase, applications_table, existing_applicant
+        self, client, supabase, applications_table, existing_applicant, admin_user_id
     ):
         insert_response = (
             supabase.table(applications_table)
@@ -155,9 +155,44 @@ class TestDeleteApplication:
             assert response.status_code == 204
             follow_up = client.get(f"/applications/{application_id}")
             assert follow_up.status_code == 404
+
+            # Soft delete, not hard delete — same check as leads/applicants.
+            row = (
+                supabase.table(applications_table)
+                .select("id,deleted_at,deleted_by")
+                .eq("id", application_id)
+                .single()
+                .execute()
+            ).data
+            assert row is not None, "row was hard-deleted, not soft-deleted"
+            assert row["deleted_at"] is not None
+            assert row["deleted_by"] == admin_user_id
         finally:
             supabase.table(applications_table).delete().eq("id", application_id).execute()
 
     def test_delete_nonexistent_application_returns_404(self, client):
         response = client.delete("/applications/00000000-0000-0000-0000-000000000000")
         assert response.status_code == 404
+
+    def test_delete_already_deleted_application_returns_404(
+        self, client, supabase, applications_table, existing_applicant
+    ):
+        insert_response = (
+            supabase.table(applications_table)
+            .insert(
+                {
+                    "applicant_id": existing_applicant,
+                    "programme": "B.Tech",
+                    "department": "Pytest Double Delete Dept",
+                }
+            )
+            .execute()
+        )
+        application_id = insert_response.data[0]["id"]
+        try:
+            first = client.delete(f"/applications/{application_id}")
+            assert first.status_code == 204
+            second = client.delete(f"/applications/{application_id}")
+            assert second.status_code == 404
+        finally:
+            supabase.table(applications_table).delete().eq("id", application_id).execute()

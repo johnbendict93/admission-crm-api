@@ -33,7 +33,7 @@ class TestGetApplicant:
 
 
 class TestCreateApplicant:
-    def test_create_applicant_then_delete(self, client, supabase, applicants_table):
+    def test_create_applicant_then_delete(self, client, supabase, applicants_table, admin_user_id):
         payload = {
             "first_name": "Pytest",
             "last_name": "Applicant",
@@ -55,6 +55,33 @@ class TestCreateApplicant:
             # reg_number is trigger-generated server-side (see set_reg_number
             # trigger audited earlier), never supplied by the client.
             assert body["reg_number"] is not None
+            # created_by is set server-side from the authenticated caller
+            # (app/services/applicants_service.create_applicant), never
+            # from the request body — the payload above deliberately
+            # doesn't send one, so this proves the server-side wiring.
+            assert body["created_by"] == admin_user_id
+        finally:
+            if created_id:
+                supabase.table(applicants_table).delete().eq("id", created_id).execute()
+
+    def test_create_applicant_ignores_client_supplied_created_by(
+        self, client, supabase, applicants_table, admin_user_id
+    ):
+        # A client-supplied created_by must never be trusted — it always
+        # gets overwritten with the authenticated caller's own id.
+        payload = {
+            "first_name": "Pytest",
+            "last_name": "SpoofedCreator",
+            "phone": "9998887771",
+            "created_by": "00000000-0000-0000-0000-000000000000",
+        }
+        created_id = None
+        try:
+            response = client.post("/applicants/", json=payload)
+            assert response.status_code == 201
+            body = response.json()
+            created_id = body["id"]
+            assert body["created_by"] == admin_user_id
         finally:
             if created_id:
                 supabase.table(applicants_table).delete().eq("id", created_id).execute()
@@ -120,7 +147,9 @@ class TestUpdateApplicant:
 
 
 class TestDeleteApplicant:
-    def test_delete_existing_applicant_returns_204(self, client, supabase, applicants_table):
+    def test_delete_existing_applicant_returns_204(
+        self, client, supabase, applicants_table, admin_user_id
+    ):
         insert_response = (
             supabase.table(applicants_table)
             .insert({"first_name": "Pytest", "last_name": "DeleteTarget", "phone": "9999900005"})
@@ -132,9 +161,36 @@ class TestDeleteApplicant:
             assert response.status_code == 204
             follow_up = client.get(f"/applicants/{applicant_id}")
             assert follow_up.status_code == 404
+
+            # Soft delete, not hard delete — same check as leads.
+            row = (
+                supabase.table(applicants_table)
+                .select("id,deleted_at,deleted_by")
+                .eq("id", applicant_id)
+                .single()
+                .execute()
+            ).data
+            assert row is not None, "row was hard-deleted, not soft-deleted"
+            assert row["deleted_at"] is not None
+            assert row["deleted_by"] == admin_user_id
         finally:
             supabase.table(applicants_table).delete().eq("id", applicant_id).execute()
 
     def test_delete_nonexistent_applicant_returns_404(self, client):
         response = client.delete("/applicants/00000000-0000-0000-0000-000000000000")
         assert response.status_code == 404
+
+    def test_delete_already_deleted_applicant_returns_404(self, client, supabase, applicants_table):
+        insert_response = (
+            supabase.table(applicants_table)
+            .insert({"first_name": "Pytest", "last_name": "DoubleDelete", "phone": "9999900007"})
+            .execute()
+        )
+        applicant_id = insert_response.data[0]["id"]
+        try:
+            first = client.delete(f"/applicants/{applicant_id}")
+            assert first.status_code == 204
+            second = client.delete(f"/applicants/{applicant_id}")
+            assert second.status_code == 404
+        finally:
+            supabase.table(applicants_table).delete().eq("id", applicant_id).execute()
