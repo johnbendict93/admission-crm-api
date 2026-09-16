@@ -54,6 +54,8 @@ class Settings(BaseSettings):
     TELECALLERS_TABLE: str = "telecallers"
     DOCUMENT_TYPES_TABLE: str = "document_types"
     LOOKUP_VALUES_TABLE: str = "lookup_values"
+    CALL_SCHEDULES_TABLE: str = "call_schedules"
+    CAMPUS_VISITS_TABLE: str = "campus_visits"
     USERS_TABLE: str = "users"
 
     @property
