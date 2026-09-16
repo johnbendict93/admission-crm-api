@@ -33,7 +33,7 @@ class TestLogin:
     def test_login_with_nonexistent_email_returns_401(self, client):
         response = client.post(
             "/auth/login",
-            json={"email": "no-such-user@admission-crm.test", "password": "whatever123"},
+            json={"email": "no-such-user@admission-crm-dev.com", "password": "whatever123"},
         )
         assert response.status_code == 401
 

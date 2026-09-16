@@ -36,14 +36,14 @@ from app.core.database import get_supabase_client  # noqa: E402
 TEST_ACCOUNTS = [
     {
         "role": "admin",
-        "default_email": "test-admin@admission-crm.test",
+        "default_email": "test-admin@admission-crm-dev.com",
         "configured_email": settings.TEST_ADMIN_EMAIL,
         "env_email_var": "TEST_ADMIN_EMAIL",
         "env_password_var": "TEST_ADMIN_PASSWORD",
     },
     {
         "role": "viewer",
-        "default_email": "test-viewer@admission-crm.test",
+        "default_email": "test-viewer@admission-crm-dev.com",
         "configured_email": settings.TEST_VIEWER_EMAIL,
         "env_email_var": "TEST_VIEWER_EMAIL",
         "env_password_var": "TEST_VIEWER_PASSWORD",
