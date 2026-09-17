@@ -177,6 +177,11 @@ def campus_visits_table():
     return settings.CAMPUS_VISITS_TABLE
 
 
+@pytest.fixture(scope="session")
+def followups_table():
+    return settings.FOLLOWUPS_TABLE
+
+
 def count_rows(supabase, table_name: str) -> int:
     response = supabase.table(table_name).select("id").execute()
     return len(response.data)
@@ -196,9 +201,10 @@ def verify_db_untouched(
     lookup_values_table,
     call_schedules_table,
     campus_visits_table,
+    followups_table,
 ):
     """Runs around every single test. Whatever a test does — including its
-    own try/finally cleanup of any row it created — the eleven tables must
+    own try/finally cleanup of any row it created — the twelve tables must
     have exactly the same row counts after the test as before it. This is
     the automated version of the manual "check row count before/after"
     step done for every prior live verification in this project.
@@ -215,6 +221,7 @@ def verify_db_untouched(
         lookup_values_table,
         call_schedules_table,
         campus_visits_table,
+        followups_table,
     ]
     before = {t: count_rows(supabase, t) for t in tables}
     yield
