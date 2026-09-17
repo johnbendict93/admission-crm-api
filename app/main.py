@@ -11,6 +11,7 @@ from app.routers import (
     auth,
     call_schedules,
     campus_visits,
+    counseling_sessions,
     document_types,
     fee_payments,
     followups,
@@ -62,6 +63,7 @@ app.include_router(call_schedules.router)
 app.include_router(campus_visits.router)
 app.include_router(followups.router)
 app.include_router(settings_router.router)
+app.include_router(counseling_sessions.router)
 
 
 @app.get("/health")
