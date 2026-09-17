@@ -18,6 +18,7 @@ from app.routers import (
     leads,
     lookup_values,
     scholarships,
+    settings as settings_router,
     telecallers,
 )
 
@@ -60,6 +61,7 @@ app.include_router(lookup_values.router)
 app.include_router(call_schedules.router)
 app.include_router(campus_visits.router)
 app.include_router(followups.router)
+app.include_router(settings_router.router)
 
 
 @app.get("/health")

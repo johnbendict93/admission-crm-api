@@ -57,6 +57,7 @@ class Settings(BaseSettings):
     CALL_SCHEDULES_TABLE: str = "call_schedules"
     CAMPUS_VISITS_TABLE: str = "campus_visits"
     FOLLOWUPS_TABLE: str = "followups"
+    SETTINGS_TABLE: str = "settings"
     USERS_TABLE: str = "users"
 
     @property
