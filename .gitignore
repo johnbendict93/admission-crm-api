@@ -16,3 +16,6 @@ env/
 .vscode/
 .idea/
 .DS_Store
+
+# Scratch/audit scripts (intentional, never committed)
+check_*.py
