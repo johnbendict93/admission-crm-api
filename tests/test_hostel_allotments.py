@@ -39,12 +39,54 @@ class TestListHostelAllotments:
     def test_list_returns_200(self, client, new_hostel_allotment):
         response = client.get("/hostel-allotments/")
         assert response.status_code == 200
-        assert isinstance(response.json(), list)
+        body = response.json()
+        assert isinstance(body["items"], list)
+        assert isinstance(body["total"], int)
+        assert body["limit"] == 50
+        assert body["offset"] == 0
+        assert isinstance(body["has_more"], bool)
 
     def test_pagination_limit_is_respected(self, client, new_hostel_allotment):
         response = client.get("/hostel-allotments/?limit=1&offset=0")
         assert response.status_code == 200
-        assert len(response.json()) <= 1
+        body = response.json()
+        assert len(body["items"]) <= 1
+        assert body["limit"] == 1
+        assert body["offset"] == 0
+
+    def test_pagination_total_and_has_more_are_accurate(
+        self, client, supabase, hostel_allotments_table, existing_applicant
+    ):
+        # Deterministic regardless of whatever else is on dev: create two
+        # known rows, then confirm `total` counts every matching row (not
+        # just the page) and `has_more` reflects whether more rows exist
+        # beyond the current page - not just that the array got sliced.
+        id_a = (
+            supabase.table(hostel_allotments_table)
+            .insert({"applicant_id": existing_applicant, "block_name": "Pagination Block", "room_number": "PA1"})
+            .execute()
+        ).data[0]["id"]
+        id_b = (
+            supabase.table(hostel_allotments_table)
+            .insert({"applicant_id": existing_applicant, "block_name": "Pagination Block", "room_number": "PA2"})
+            .execute()
+        ).data[0]["id"]
+        try:
+            page = client.get("/hostel-allotments/?limit=1&offset=0")
+            assert page.status_code == 200
+            body = page.json()
+            assert body["total"] >= 2
+            assert body["has_more"] is True
+
+            full_limit = min(body["total"], 200)
+            full_page = client.get(f"/hostel-allotments/?limit={full_limit}&offset=0")
+            assert full_page.status_code == 200
+            full_body = full_page.json()
+            assert len(full_body["items"]) == full_body["total"]
+            assert full_body["has_more"] is False
+        finally:
+            supabase.table(hostel_allotments_table).delete().eq("id", id_a).execute()
+            supabase.table(hostel_allotments_table).delete().eq("id", id_b).execute()
 
 
 class TestGetHostelAllotment:

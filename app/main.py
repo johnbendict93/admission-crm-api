@@ -26,7 +26,25 @@ from app.routers import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Admission CRM API", version="0.1.0")
+openapi_tags = [
+    {"name": "Auth", "description": "Login and JWT-based authentication."},
+    {"name": "Leads", "description": "Prospective students captured before they apply - the top of the admissions funnel."},
+    {"name": "Applicants", "description": "Individuals who have started the application process, with full personal and academic profile data."},
+    {"name": "Applications", "description": "A specific programme application tied to an applicant, including seat allotment and review status."},
+    {"name": "Fee Payments", "description": "Payments recorded against an applicant's fees."},
+    {"name": "Scholarships", "description": "Scholarship applications and awards tied to an applicant."},
+    {"name": "Hostel Allotments", "description": "Hostel room assignments tied to an applicant."},
+    {"name": "Telecallers", "description": "Staff who place outbound calls to leads."},
+    {"name": "Document Types", "description": "Configurable list of document types applicants may be asked to submit."},
+    {"name": "Lookup Values", "description": "Configurable dropdown values (grouped by type) used elsewhere in the app."},
+    {"name": "Call Schedules", "description": "Scheduled outbound calls to a lead."},
+    {"name": "Campus Visits", "description": "Logged campus visits made by a lead."},
+    {"name": "Followups", "description": "Logged follow-up calls made to a lead."},
+    {"name": "Settings", "description": "Key/value application configuration, grouped by category."},
+    {"name": "Counseling Sessions", "description": "Logged counseling sessions between a counselor and an applicant."},
+]
+
+app = FastAPI(title="Admission CRM API", version="0.1.0", openapi_tags=openapi_tags)
 
 # Origins come from ALLOWED_ORIGINS in .env — add your real Vercel URL there
 # once the Next.js frontend is deployed, no code change needed.

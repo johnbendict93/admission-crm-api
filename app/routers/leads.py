@@ -7,22 +7,31 @@ from supabase import Client
 from app.core.database import get_supabase_client
 from app.core.jwt_auth import get_current_user, require_deleter, require_writer
 from app.models.leads import LeadCreate, LeadResponse, LeadUpdate
+from app.models.pagination import PaginatedResponse
 from app.services import leads_service
 
 router = APIRouter(prefix="/leads", tags=["Leads"])
 
 
-@router.get("/", response_model=List[LeadResponse])
+@router.get("/", response_model=PaginatedResponse[LeadResponse])
 def list_leads(
     limit: int = Query(50, ge=1, le=200, description="Rows per page (max 200)"),
     offset: int = Query(0, ge=0),
     supabase: Client = Depends(get_supabase_client),
     current_user: dict = Depends(get_current_user),
 ):
+    """List leads, most recently created first, excluding soft-deleted rows."""
     try:
-        return leads_service.get_all_leads(supabase, limit=limit, offset=offset)
+        items, total = leads_service.get_all_leads(supabase, limit=limit, offset=offset)
     except APIError as e:
         raise HTTPException(status_code=400, detail=f"Database error: {e.message}")
+    return PaginatedResponse(
+        items=items,
+        total=total,
+        limit=limit,
+        offset=offset,
+        has_more=offset + len(items) < total,
+    )
 
 
 @router.get("/{lead_id}", response_model=LeadResponse)
@@ -31,6 +40,7 @@ def get_lead(
     supabase: Client = Depends(get_supabase_client),
     current_user: dict = Depends(get_current_user),
 ):
+    """Get a single lead by id."""
     try:
         lead = leads_service.get_lead_by_id(supabase, lead_id)
     except APIError as e:
@@ -46,6 +56,7 @@ def create_lead(
     supabase: Client = Depends(get_supabase_client),
     current_user: dict = Depends(require_writer),
 ):
+    """Create a new lead."""
     try:
         created = leads_service.create_lead(supabase, lead)
     except APIError as e:
@@ -62,6 +73,7 @@ def update_lead(
     supabase: Client = Depends(get_supabase_client),
     current_user: dict = Depends(require_writer),
 ):
+    """Partially update a lead by id - only the fields provided are changed."""
     payload = lead.model_dump(exclude_unset=True)
     if not payload:
         raise HTTPException(status_code=400, detail="No fields provided to update")
@@ -80,6 +92,7 @@ def delete_lead(
     supabase: Client = Depends(get_supabase_client),
     current_user: dict = Depends(require_deleter),
 ):
+    """Soft-delete a lead by id (sets deleted_at/deleted_by; the row is preserved)."""
     try:
         deleted = leads_service.delete_lead(supabase, lead_id, deleted_by=current_user["id"])
     except APIError as e:

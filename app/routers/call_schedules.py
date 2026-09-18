@@ -7,22 +7,31 @@ from supabase import Client
 from app.core.database import get_supabase_client
 from app.core.jwt_auth import get_current_user, require_deleter, require_writer
 from app.models.call_schedules import CallScheduleCreate, CallScheduleResponse, CallScheduleUpdate
+from app.models.pagination import PaginatedResponse
 from app.services import call_schedules_service
 
 router = APIRouter(prefix="/call-schedules", tags=["Call Schedules"])
 
 
-@router.get("/", response_model=List[CallScheduleResponse])
+@router.get("/", response_model=PaginatedResponse[CallScheduleResponse])
 def list_call_schedules(
     limit: int = Query(50, ge=1, le=200, description="Rows per page (max 200)"),
     offset: int = Query(0, ge=0),
     supabase: Client = Depends(get_supabase_client),
     current_user: dict = Depends(get_current_user),
 ):
+    """List call schedules, most recently created first, excluding soft-deleted rows."""
     try:
-        return call_schedules_service.get_all_call_schedules(supabase, limit=limit, offset=offset)
+        items, total = call_schedules_service.get_all_call_schedules(supabase, limit=limit, offset=offset)
     except APIError as e:
         raise HTTPException(status_code=400, detail=f"Database error: {e.message}")
+    return PaginatedResponse(
+        items=items,
+        total=total,
+        limit=limit,
+        offset=offset,
+        has_more=offset + len(items) < total,
+    )
 
 
 @router.get("/{call_schedule_id}", response_model=CallScheduleResponse)
@@ -31,6 +40,7 @@ def get_call_schedule(
     supabase: Client = Depends(get_supabase_client),
     current_user: dict = Depends(get_current_user),
 ):
+    """Get a single call schedule by id."""
     try:
         call_schedule = call_schedules_service.get_call_schedule_by_id(supabase, call_schedule_id)
     except APIError as e:
@@ -46,6 +56,7 @@ def create_call_schedule(
     supabase: Client = Depends(get_supabase_client),
     current_user: dict = Depends(require_writer),
 ):
+    """Create a new call schedule."""
     try:
         created = call_schedules_service.create_call_schedule(supabase, call_schedule)
     except APIError as e:
@@ -62,6 +73,7 @@ def update_call_schedule(
     supabase: Client = Depends(get_supabase_client),
     current_user: dict = Depends(require_writer),
 ):
+    """Partially update a call schedule by id - only the fields provided are changed."""
     payload = call_schedule.model_dump(exclude_unset=True, mode="json")
     if not payload:
         raise HTTPException(status_code=400, detail="No fields provided to update")
@@ -80,6 +92,7 @@ def delete_call_schedule(
     supabase: Client = Depends(get_supabase_client),
     current_user: dict = Depends(require_deleter),
 ):
+    """Soft-delete a call schedule by id (sets deleted_at/deleted_by; the row is preserved)."""
     try:
         deleted = call_schedules_service.delete_call_schedule(
             supabase, call_schedule_id, deleted_by=current_user["id"]

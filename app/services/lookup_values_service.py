@@ -28,7 +28,7 @@ def get_all_lookup_values(supabase: Client, limit: int = 50, offset: int = 0):
     try:
         response = (
             supabase.table(TABLE_NAME)
-            .select(LOOKUP_VALUE_COLUMNS)
+            .select(LOOKUP_VALUE_COLUMNS, count="exact")
             .eq("is_active", True)
             .order("type")
             .order("sort_order")
@@ -39,7 +39,7 @@ def get_all_lookup_values(supabase: Client, limit: int = 50, offset: int = 0):
     except APIError as e:
         logger.error("Supabase error in get_all_lookup_values: %s", e)
         raise
-    return response.data
+    return response.data, response.count
 
 
 def get_lookup_value_by_id(supabase: Client, lookup_value_id: str):

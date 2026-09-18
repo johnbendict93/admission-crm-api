@@ -16,11 +16,20 @@ supabase-py has no built-in verify/get_claims() helper for this yet (see
 https://github.com/supabase/supabase-py/issues/1183), so this is hand-rolled
 with PyJWT - the standard pattern recommended in Supabase's own docs for
 non-JS backends.
+
+Auth extraction uses FastAPI's HTTPBearer security scheme (not a raw Header
+param) so /docs gets a real "Authorize" button and the OpenAPI spec carries
+a proper securityScheme - added Sept 2026 after a consistency review found
+every protected endpoint required manually pasting "Bearer <token>" into a
+plain header field on every single request in Swagger UI. auto_error=False
+so a missing/malformed header still reaches our own error handling below (a
+consistent 401 with our own detail message) instead of HTTPBearer's default.
 """
 from typing import Optional
 
 import jwt
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import PyJWKClient
 from supabase import Client
 
@@ -34,6 +43,14 @@ from app.core.database import get_supabase_client
 # (e.g. by tooling/tests that touch both).
 _jwks_clients: dict[str, PyJWKClient] = {}
 
+# See module docstring: this is what registers the OpenAPI securityScheme
+# and adds the /docs "Authorize" button. auto_error=False keeps a missing
+# or malformed header (or wrong scheme, e.g. "Basic ...") from short-
+# circuiting with FastAPI's own generic error - it comes back as None and
+# falls through to get_current_user's own check below instead, so the
+# 401 detail message stays exactly what it was before this change.
+_bearer_scheme = HTTPBearer(auto_error=False)
+
 
 def _get_jwks_client(supabase_url: str) -> PyJWKClient:
     if supabase_url not in _jwks_clients:
@@ -46,24 +63,22 @@ def _get_jwks_client(supabase_url: str) -> PyJWKClient:
 
 
 def get_current_user(
-    authorization: Optional[str] = Header(None),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_scheme),
     supabase: Client = Depends(get_supabase_client),
 ) -> dict:
     """Decodes and verifies a Supabase-issued access token, then looks up
     the matching row in public.users to get the app-level role (Supabase
     Auth itself knows nothing about admin/counselor/staff/viewer - that's
     our own users table). Returns that row as a dict; raises 401 on any
-    failure (missing header, malformed header, bad/expired signature, or
-    the user id from the token not existing in public.users).
+    failure (missing header, malformed header/scheme, bad/expired
+    signature, or the user id from the token not existing in public.users).
     """
-    if not authorization or not authorization.lower().startswith("bearer "):
+    if not credentials or not credentials.credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing or malformed Authorization header (expected 'Bearer <token>')",
         )
-    token = authorization.split(" ", 1)[1].strip()
-    if not token:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Empty bearer token")
+    token = credentials.credentials.strip()
 
     try:
         signing_key = _get_jwks_client(settings.SUPABASE_URL).get_signing_key_from_jwt(token)

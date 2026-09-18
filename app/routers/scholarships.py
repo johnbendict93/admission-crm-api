@@ -7,22 +7,31 @@ from supabase import Client
 from app.core.database import get_supabase_client
 from app.core.jwt_auth import get_current_user, require_deleter, require_writer
 from app.models.scholarships import ScholarshipCreate, ScholarshipResponse, ScholarshipUpdate
+from app.models.pagination import PaginatedResponse
 from app.services import scholarships_service
 
 router = APIRouter(prefix="/scholarships", tags=["Scholarships"])
 
 
-@router.get("/", response_model=List[ScholarshipResponse])
+@router.get("/", response_model=PaginatedResponse[ScholarshipResponse])
 def list_scholarships(
     limit: int = Query(50, ge=1, le=200, description="Rows per page (max 200)"),
     offset: int = Query(0, ge=0),
     supabase: Client = Depends(get_supabase_client),
     current_user: dict = Depends(get_current_user),
 ):
+    """List scholarships, most recently created first, excluding soft-deleted rows."""
     try:
-        return scholarships_service.get_all_scholarships(supabase, limit=limit, offset=offset)
+        items, total = scholarships_service.get_all_scholarships(supabase, limit=limit, offset=offset)
     except APIError as e:
         raise HTTPException(status_code=400, detail=f"Database error: {e.message}")
+    return PaginatedResponse(
+        items=items,
+        total=total,
+        limit=limit,
+        offset=offset,
+        has_more=offset + len(items) < total,
+    )
 
 
 @router.get("/{scholarship_id}", response_model=ScholarshipResponse)
@@ -31,6 +40,7 @@ def get_scholarship(
     supabase: Client = Depends(get_supabase_client),
     current_user: dict = Depends(get_current_user),
 ):
+    """Get a single scholarship by id."""
     try:
         scholarship = scholarships_service.get_scholarship_by_id(supabase, scholarship_id)
     except APIError as e:
@@ -46,6 +56,7 @@ def create_scholarship(
     supabase: Client = Depends(get_supabase_client),
     current_user: dict = Depends(require_writer),
 ):
+    """Create a new scholarship."""
     try:
         created = scholarships_service.create_scholarship(supabase, scholarship)
     except APIError as e:
@@ -62,6 +73,7 @@ def update_scholarship(
     supabase: Client = Depends(get_supabase_client),
     current_user: dict = Depends(require_writer),
 ):
+    """Partially update a scholarship by id - only the fields provided are changed."""
     payload = scholarship.model_dump(exclude_unset=True, mode="json")
     if not payload:
         raise HTTPException(status_code=400, detail="No fields provided to update")
@@ -80,6 +92,7 @@ def delete_scholarship(
     supabase: Client = Depends(get_supabase_client),
     current_user: dict = Depends(require_deleter),
 ):
+    """Soft-delete a scholarship by id (sets deleted_at/deleted_by; the row is preserved)."""
     try:
         deleted = scholarships_service.delete_scholarship(supabase, scholarship_id, deleted_by=current_user["id"])
     except APIError as e:

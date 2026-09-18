@@ -7,22 +7,31 @@ from supabase import Client
 from app.core.database import get_supabase_client
 from app.core.jwt_auth import get_current_user, require_deleter, require_writer
 from app.models.applicants import ApplicantCreate, ApplicantResponse, ApplicantUpdate
+from app.models.pagination import PaginatedResponse
 from app.services import applicants_service
 
 router = APIRouter(prefix="/applicants", tags=["Applicants"])
 
 
-@router.get("/", response_model=List[ApplicantResponse])
+@router.get("/", response_model=PaginatedResponse[ApplicantResponse])
 def list_applicants(
     limit: int = Query(50, ge=1, le=200, description="Rows per page (max 200)"),
     offset: int = Query(0, ge=0),
     supabase: Client = Depends(get_supabase_client),
     current_user: dict = Depends(get_current_user),
 ):
+    """List applicants, most recently created first, excluding soft-deleted rows."""
     try:
-        return applicants_service.get_all_applicants(supabase, limit=limit, offset=offset)
+        items, total = applicants_service.get_all_applicants(supabase, limit=limit, offset=offset)
     except APIError as e:
         raise HTTPException(status_code=400, detail=f"Database error: {e.message}")
+    return PaginatedResponse(
+        items=items,
+        total=total,
+        limit=limit,
+        offset=offset,
+        has_more=offset + len(items) < total,
+    )
 
 
 @router.get("/{applicant_id}", response_model=ApplicantResponse)
@@ -31,6 +40,7 @@ def get_applicant(
     supabase: Client = Depends(get_supabase_client),
     current_user: dict = Depends(get_current_user),
 ):
+    """Get a single applicant by id."""
     try:
         applicant = applicants_service.get_applicant_by_id(supabase, applicant_id)
     except APIError as e:
@@ -46,6 +56,7 @@ def create_applicant(
     supabase: Client = Depends(get_supabase_client),
     current_user: dict = Depends(require_writer),
 ):
+    """Create a new applicant."""
     try:
         created = applicants_service.create_applicant(supabase, applicant, created_by=current_user["id"])
     except APIError as e:
@@ -62,6 +73,7 @@ def update_applicant(
     supabase: Client = Depends(get_supabase_client),
     current_user: dict = Depends(require_writer),
 ):
+    """Partially update a applicant by id - only the fields provided are changed."""
     payload = applicant.model_dump(exclude_unset=True, mode="json")
     if not payload:
         raise HTTPException(status_code=400, detail="No fields provided to update")
@@ -80,6 +92,7 @@ def delete_applicant(
     supabase: Client = Depends(get_supabase_client),
     current_user: dict = Depends(require_deleter),
 ):
+    """Soft-delete a applicant by id (sets deleted_at/deleted_by; the row is preserved)."""
     try:
         deleted = applicants_service.delete_applicant(supabase, applicant_id, deleted_by=current_user["id"])
     except APIError as e:

@@ -7,22 +7,31 @@ from supabase import Client
 from app.core.database import get_supabase_client
 from app.core.jwt_auth import get_current_user, require_deleter, require_writer
 from app.models.telecallers import TelecallerCreate, TelecallerResponse, TelecallerUpdate
+from app.models.pagination import PaginatedResponse
 from app.services import telecallers_service
 
 router = APIRouter(prefix="/telecallers", tags=["Telecallers"])
 
 
-@router.get("/", response_model=List[TelecallerResponse])
+@router.get("/", response_model=PaginatedResponse[TelecallerResponse])
 def list_telecallers(
     limit: int = Query(50, ge=1, le=200, description="Rows per page (max 200)"),
     offset: int = Query(0, ge=0),
     supabase: Client = Depends(get_supabase_client),
     current_user: dict = Depends(get_current_user),
 ):
+    """List telecallers, most recently created first, excluding soft-deleted rows."""
     try:
-        return telecallers_service.get_all_telecallers(supabase, limit=limit, offset=offset)
+        items, total = telecallers_service.get_all_telecallers(supabase, limit=limit, offset=offset)
     except APIError as e:
         raise HTTPException(status_code=400, detail=f"Database error: {e.message}")
+    return PaginatedResponse(
+        items=items,
+        total=total,
+        limit=limit,
+        offset=offset,
+        has_more=offset + len(items) < total,
+    )
 
 
 @router.get("/{telecaller_id}", response_model=TelecallerResponse)
@@ -31,6 +40,7 @@ def get_telecaller(
     supabase: Client = Depends(get_supabase_client),
     current_user: dict = Depends(get_current_user),
 ):
+    """Get a single telecaller by id."""
     try:
         telecaller = telecallers_service.get_telecaller_by_id(supabase, telecaller_id)
     except APIError as e:
@@ -46,6 +56,7 @@ def create_telecaller(
     supabase: Client = Depends(get_supabase_client),
     current_user: dict = Depends(require_writer),
 ):
+    """Create a new telecaller."""
     try:
         created = telecallers_service.create_telecaller(supabase, telecaller)
     except APIError as e:
@@ -62,6 +73,7 @@ def update_telecaller(
     supabase: Client = Depends(get_supabase_client),
     current_user: dict = Depends(require_writer),
 ):
+    """Partially update a telecaller by id - only the fields provided are changed."""
     payload = telecaller.model_dump(exclude_unset=True, mode="json")
     if not payload:
         raise HTTPException(status_code=400, detail="No fields provided to update")
@@ -80,6 +92,7 @@ def delete_telecaller(
     supabase: Client = Depends(get_supabase_client),
     current_user: dict = Depends(require_deleter),
 ):
+    """Soft-delete a telecaller by id (sets deleted_at/deleted_by; the row is preserved)."""
     try:
         deleted = telecallers_service.delete_telecaller(supabase, telecaller_id, deleted_by=current_user["id"])
     except APIError as e:

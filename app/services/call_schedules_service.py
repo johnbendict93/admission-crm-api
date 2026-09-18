@@ -23,7 +23,7 @@ def get_all_call_schedules(supabase: Client, limit: int = 50, offset: int = 0):
     try:
         response = (
             supabase.table(TABLE_NAME)
-            .select(CALL_SCHEDULE_COLUMNS)
+            .select(CALL_SCHEDULE_COLUMNS, count="exact")
             .is_("deleted_at", "null")  # soft-deleted rows excluded by default
             .order("created_at", desc=True)
             .order("id")  # tiebreaker for stable, deterministic pagination order
@@ -33,7 +33,7 @@ def get_all_call_schedules(supabase: Client, limit: int = 50, offset: int = 0):
     except APIError as e:
         logger.error("Supabase error in get_all_call_schedules: %s", e)
         raise
-    return response.data
+    return response.data, response.count
 
 
 def get_call_schedule_by_id(supabase: Client, call_schedule_id: str):

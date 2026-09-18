@@ -31,7 +31,7 @@ def get_all_applicants(supabase: Client, limit: int = 50, offset: int = 0):
     try:
         response = (
             supabase.table(TABLE_NAME)
-            .select(APPLICANT_COLUMNS)
+            .select(APPLICANT_COLUMNS, count="exact")
             .is_("deleted_at", "null")  # soft-deleted rows excluded by default
             .order("created_at", desc=True)
             .order("id")  # tiebreaker: seeded rows share identical created_at,
@@ -42,7 +42,7 @@ def get_all_applicants(supabase: Client, limit: int = 50, offset: int = 0):
     except APIError as e:
         logger.error("Supabase error in get_all_applicants: %s", e)
         raise
-    return response.data
+    return response.data, response.count
 
 
 def get_applicant_by_id(supabase: Client, applicant_id: str):

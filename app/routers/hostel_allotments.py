@@ -11,22 +11,31 @@ from app.models.hostel_allotments import (
     HostelAllotmentResponse,
     HostelAllotmentUpdate,
 )
+from app.models.pagination import PaginatedResponse
 from app.services import hostel_allotments_service
 
 router = APIRouter(prefix="/hostel-allotments", tags=["Hostel Allotments"])
 
 
-@router.get("/", response_model=List[HostelAllotmentResponse])
+@router.get("/", response_model=PaginatedResponse[HostelAllotmentResponse])
 def list_hostel_allotments(
     limit: int = Query(50, ge=1, le=200, description="Rows per page (max 200)"),
     offset: int = Query(0, ge=0),
     supabase: Client = Depends(get_supabase_client),
     current_user: dict = Depends(get_current_user),
 ):
+    """List hostel allotments, most recently created first, excluding soft-deleted rows."""
     try:
-        return hostel_allotments_service.get_all_hostel_allotments(supabase, limit=limit, offset=offset)
+        items, total = hostel_allotments_service.get_all_hostel_allotments(supabase, limit=limit, offset=offset)
     except APIError as e:
         raise HTTPException(status_code=400, detail=f"Database error: {e.message}")
+    return PaginatedResponse(
+        items=items,
+        total=total,
+        limit=limit,
+        offset=offset,
+        has_more=offset + len(items) < total,
+    )
 
 
 @router.get("/{hostel_allotment_id}", response_model=HostelAllotmentResponse)
@@ -35,6 +44,7 @@ def get_hostel_allotment(
     supabase: Client = Depends(get_supabase_client),
     current_user: dict = Depends(get_current_user),
 ):
+    """Get a single hostel allotment by id."""
     try:
         hostel_allotment = hostel_allotments_service.get_hostel_allotment_by_id(supabase, hostel_allotment_id)
     except APIError as e:
@@ -50,6 +60,7 @@ def create_hostel_allotment(
     supabase: Client = Depends(get_supabase_client),
     current_user: dict = Depends(require_writer),
 ):
+    """Create a new hostel allotment."""
     try:
         created = hostel_allotments_service.create_hostel_allotment(supabase, hostel_allotment)
     except APIError as e:
@@ -66,6 +77,7 @@ def update_hostel_allotment(
     supabase: Client = Depends(get_supabase_client),
     current_user: dict = Depends(require_writer),
 ):
+    """Partially update a hostel allotment by id - only the fields provided are changed."""
     payload = hostel_allotment.model_dump(exclude_unset=True, mode="json")
     if not payload:
         raise HTTPException(status_code=400, detail="No fields provided to update")
@@ -84,6 +96,7 @@ def delete_hostel_allotment(
     supabase: Client = Depends(get_supabase_client),
     current_user: dict = Depends(require_deleter),
 ):
+    """Soft-delete a hostel allotment by id (sets deleted_at/deleted_by; the row is preserved)."""
     try:
         deleted = hostel_allotments_service.delete_hostel_allotment(
             supabase, hostel_allotment_id, deleted_by=current_user["id"]

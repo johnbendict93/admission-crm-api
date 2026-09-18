@@ -26,7 +26,7 @@ def get_all_hostel_allotments(supabase: Client, limit: int = 50, offset: int = 0
     try:
         response = (
             supabase.table(TABLE_NAME)
-            .select(HOSTEL_ALLOTMENT_COLUMNS)
+            .select(HOSTEL_ALLOTMENT_COLUMNS, count="exact")
             .is_("deleted_at", "null")  # soft-deleted rows excluded by default
             .order("created_at", desc=True)
             .order("id")  # tiebreaker for stable, deterministic pagination order
@@ -36,7 +36,7 @@ def get_all_hostel_allotments(supabase: Client, limit: int = 50, offset: int = 0
     except APIError as e:
         logger.error("Supabase error in get_all_hostel_allotments: %s", e)
         raise
-    return response.data
+    return response.data, response.count
 
 
 def get_hostel_allotment_by_id(supabase: Client, hostel_allotment_id: str):

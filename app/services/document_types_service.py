@@ -32,7 +32,7 @@ def get_all_document_types(supabase: Client, limit: int = 50, offset: int = 0):
     try:
         response = (
             supabase.table(TABLE_NAME)
-            .select(DOCUMENT_TYPE_COLUMNS)
+            .select(DOCUMENT_TYPE_COLUMNS, count="exact")
             .eq("is_active", True)
             .order("sort_order")
             .order("id")  # tiebreaker for stable, deterministic pagination order
@@ -42,7 +42,7 @@ def get_all_document_types(supabase: Client, limit: int = 50, offset: int = 0):
     except APIError as e:
         logger.error("Supabase error in get_all_document_types: %s", e)
         raise
-    return response.data
+    return response.data, response.count
 
 
 def get_document_type_by_id(supabase: Client, document_type_id: str):

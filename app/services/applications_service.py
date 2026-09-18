@@ -26,7 +26,7 @@ def get_all_applications(supabase: Client, limit: int = 50, offset: int = 0):
     try:
         response = (
             supabase.table(TABLE_NAME)
-            .select(APPLICATION_COLUMNS)
+            .select(APPLICATION_COLUMNS, count="exact")
             .is_("deleted_at", "null")  # soft-deleted rows excluded by default
             .order("created_at", desc=True)
             .order("id")  # tiebreaker: seeded rows share identical created_at,
@@ -37,7 +37,7 @@ def get_all_applications(supabase: Client, limit: int = 50, offset: int = 0):
     except APIError as e:
         logger.error("Supabase error in get_all_applications: %s", e)
         raise
-    return response.data
+    return response.data, response.count
 
 
 def get_application_by_id(supabase: Client, application_id: str):

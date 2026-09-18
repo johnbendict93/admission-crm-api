@@ -32,7 +32,7 @@ def get_all_settings(supabase: Client, limit: int = 50, offset: int = 0):
     try:
         response = (
             supabase.table(TABLE_NAME)
-            .select(SETTING_COLUMNS)
+            .select(SETTING_COLUMNS, count="exact")
             .eq("is_active", True)
             .order("category")
             .order("key")
@@ -42,7 +42,7 @@ def get_all_settings(supabase: Client, limit: int = 50, offset: int = 0):
     except APIError as e:
         logger.error("Supabase error in get_all_settings: %s", e)
         raise
-    return response.data
+    return response.data, response.count
 
 
 def get_setting_by_id(supabase: Client, setting_id: str):
