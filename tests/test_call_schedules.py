@@ -102,7 +102,7 @@ class TestCreateCallSchedule:
         payload = {
             "lead_id": existing_lead,
             "scheduled_by": "Kavya New Telecaller",
-            "scheduled_time": "2026-10-01T10:30:00",
+            "scheduled_time": "2026-10-01T10:30:00+05:30",
         }
         created_id = None
         try:
@@ -118,6 +118,58 @@ class TestCreateCallSchedule:
         finally:
             if created_id:
                 supabase.table(call_schedules_table).delete().eq("id", created_id).execute()
+
+
+class TestCallScheduleErrorHandling:
+    """scheduled_time must carry an explicit UTC offset - see
+    app/models/call_schedules.py's _require_tz_aware_scheduled_time.
+    A naive value is rejected at request-parsing time (Pydantic), which
+    FastAPI surfaces as 422, not the 400 used elsewhere in this project
+    for DB-level (CHECK constraint) validation errors - a deliberate,
+    documented distinction: this is a malformed-request problem, not a
+    business-rule violation the database enforces."""
+
+    def test_naive_scheduled_time_rejected_on_create(self, client, existing_lead):
+        response = client.post(
+            "/call-schedules/",
+            json={
+                "lead_id": existing_lead,
+                "scheduled_by": "Naive Time Telecaller",
+                "scheduled_time": "2026-10-01T10:30:00",
+            },
+        )
+        assert response.status_code == 422
+
+    def test_offset_aware_scheduled_time_accepted_on_create(
+        self, client, supabase, call_schedules_table, existing_lead
+    ):
+        payload = {
+            "lead_id": existing_lead,
+            "scheduled_by": "Offset Aware Telecaller",
+            "scheduled_time": "2026-10-01T10:30:00+05:30",
+        }
+        created_id = None
+        try:
+            response = client.post("/call-schedules/", json=payload)
+            assert response.status_code == 201
+            created_id = response.json()["id"]
+        finally:
+            if created_id:
+                supabase.table(call_schedules_table).delete().eq("id", created_id).execute()
+
+    def test_naive_scheduled_time_rejected_on_update(self, client, new_call_schedule):
+        response = client.patch(
+            f"/call-schedules/{new_call_schedule}",
+            json={"scheduled_time": "2026-10-02T11:00:00"},
+        )
+        assert response.status_code == 422
+
+    def test_offset_aware_scheduled_time_accepted_on_update(self, client, new_call_schedule):
+        response = client.patch(
+            f"/call-schedules/{new_call_schedule}",
+            json={"scheduled_time": "2026-10-02T11:00:00+05:30"},
+        )
+        assert response.status_code == 200
 
 
 class TestUpdateCallSchedule:
