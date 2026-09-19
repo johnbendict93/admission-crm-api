@@ -1,0 +1,58 @@
+-- Migration 0014: Convert call_schedules.scheduled_time to timestamptz
+--
+-- UNLIKE 0013, this is a DATA-CONVERTING migration, not catalog-only.
+--
+-- Background:
+--   call_schedules.scheduled_time is currently `timestamp without time
+--   zone`, written as naive local IST time (no offset) by both writers:
+--     - dce_crm's pages/6_Scheduling_Visits_Telecallers.py (Streamlit UI)
+--     - Admission-CRM-API's POST/PATCH /call_schedules (FastAPI)
+--   As of commit bda7446 (dce_crm) and 2bb239e (Admission-CRM-API), both
+--   writers now send/require an explicit UTC offset (+05:30) on every
+--   NEW scheduled_time. This migration only concerns EXISTING rows that
+--   predate that fix and are still stored as naive IST wall-clock time.
+--
+-- Conversion:
+--   ALTER COLUMN scheduled_time TYPE timestamptz
+--     USING scheduled_time AT TIME ZONE 'Asia/Kolkata'
+--   This tells Postgres to interpret each existing naive value AS IST
+--   (not as the session's UTC default), converting it to the correct
+--   UTC instant. This is the "Case B" approach from
+--   Claude outputs/timezone-migration-proposal.md — a genuine value
+--   reinterpretation, not a no-op cast like 0013.
+--
+-- Evidence this IST assumption is reasonable for existing data:
+--   - check_scheduled_time_validation.py (dev, 3 seeded rows) and
+--     check_scheduled_time_validation_prod.py (prod, 1 real row) both
+--     read every existing scheduled_time and flagged nothing outside
+--     plausible IST business hours (6am-10pm).
+--   - The 1 real prod row (~16:10 IST, Sept 4) is consistent with a
+--     completed call logged near end of day relative to its
+--     created_at (~16:10:47 UTC same nominal date) once the +05:30
+--     offset is applied — see the before/after walkthrough given to
+--     John separately before this migration is applied to either env.
+--   - n=1 (prod) and n=3 (dev, self-seeded) is NOT strong statistical
+--     evidence; this remains a documented assumption, not a proven
+--     fact, and is called out as such in every review of this
+--     migration.
+--
+-- Explicitly NOT covered by this migration:
+--   - Any change to the writers — both already fixed, separately,
+--     before this migration was drafted.
+--   - Rejecting future naive writes — enforced at the API validation
+--     layer (app/models/call_schedules.py field_validator), not here.
+--
+-- Cross-app check: grepped dce_crm for every scheduled_time reference.
+-- Only read-paths are display/sort in
+-- pages/6_Scheduling_Visits_Telecallers.py and pages/7_Dashboard.py;
+-- neither does naive-vs-aware arithmetic that this type change would
+-- break — both simply display or sort the value via PostgREST.
+--
+-- No index or view depends on scheduled_time (audited via
+-- information_schema + pg_indexes + pg_depend immediately before
+-- writing this, same method as 0013).
+
+ALTER TABLE public.call_schedules
+    ALTER COLUMN scheduled_time
+    TYPE timestamptz
+    USING scheduled_time AT TIME ZONE 'Asia/Kolkata';
