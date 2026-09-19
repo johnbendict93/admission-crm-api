@@ -172,3 +172,23 @@ refuses). `migrations/pending/0017_revoke_anon_execute_rls_auto_enable.sql` revo
 EXECUTE from PUBLIC/anon/authenticated, guarded so it is a no-op where the function does
 not exist. Independent of 0016 (no dce_crm dependency). Check owner/ACL first
 (`check_tier2_audit.py`, section 6).
+
+### dce_crm dev rehearsal (before 0016): `migrations/0016_tools/setup_dce_crm_dev.ps1`
+
+Builds `..\dce_crm_dev` (a remote-less clone of dce_crm) with a dev-only
+`.streamlit\secrets.toml`: dev URL + key from this repo's `.env` (never printed),
+Groq/SMTP credentials dummied (or your own dev sender with `-EnableEmail`), report
+recipient forced to `-Recipient`. `-Stage 1` = dev anon key (baseline), `-Stage 2` = dev
+secret key (the rehearsal for prod's service_role swap). It aborts unless the secrets path is
+git-ignored, and checks `git status` is clean afterwards. It never modifies the prod copy.
+
+Order (do not reorder): dev config -> dev baseline (Stage 1) -> dev key swap (Stage 2) ->
+dev 0016 -> prod key swap + daily-report scheduler -> prod verify -> prod 0016.
+
+Test plan, run by hand in the dev app once per stage (both stages must behave the same):
+leads, followups, call schedules, campus visits and telecallers pages all load; one real
+write in each area you use (call_schedules matters most: offset-aware datetime from 0014);
+"Send Daily Report Now" to your own address arrives (needs `-EnableEmail`); the report's AI
+summary reads "AI Error: ..." because the Groq key is a dummy - that is expected.
+supabase-py must be >= 2.17 for `sb_secret_` / `sb_publishable_` keys (2.15 rejects them);
+prod's legacy service_role JWT works on any version.
