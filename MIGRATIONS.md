@@ -161,5 +161,14 @@ python migrations/0016_tools/rpc_probe.py --env dev          # DEV ONLY: can ano
 Planned order: dev copy of dce_crm on the dev anon key (baseline) -> dev secret key
 (same behaviour) -> dev snapshot + apply 0016 -> verify + probe -> prod key swap in
 Streamlit Cloud and the scheduler -> confirm dce_crm works on prod -> prod snapshot
-+ apply. A `REVOKE EXECUTE` on the trigger functions is separate and only written if
-`rpc_probe.py` shows they are reachable.
++ apply.
+
+### Migration 0017 (DRAFT, NOT APPLIED): revoke anon EXECUTE on `rls_auto_enable()`
+
+`rpc_probe.py` on dev: the four trigger functions are NOT exposed over REST (404 /
+PGRST202) so they need nothing; `public.rls_auto_enable()` (event trigger,
+SECURITY DEFINER, present on dev only) IS reachable (400 / 0A000 - it is invoked, then
+refuses). `migrations/pending/0017_revoke_anon_execute_rls_auto_enable.sql` revokes
+EXECUTE from PUBLIC/anon/authenticated, guarded so it is a no-op where the function does
+not exist. Independent of 0016 (no dce_crm dependency). Check owner/ACL first
+(`check_tier2_audit.py`, section 6).
