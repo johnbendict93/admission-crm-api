@@ -133,3 +133,33 @@ Side effect on prod: `dce_crm/verify_live_deployed_app.py` and
 `verify_soft_delete_visibility_fix.py` read `users` with the anon key and will
 stop working (they are one-off scripts, not app code).
 
+
+## Migration 0016 (DRAFT, NOT APPLIED): Tier 2 anon/authenticated lockdown
+
+**Status: draft. Not applied to dev or prod.** The file is
+`migrations/pending/0016_lock_down_tier2_anon_access.sql` - deliberately outside
+`migrations/*.sql`, which is all `run_migrations.py` discovers, so no `apply` run can
+pick it up by accident. To release it, `git mv` it into `migrations/` in the same change
+that applies it.
+
+It revokes ALL from `anon` and `authenticated` on `leads`, `followups`,
+`call_schedules`, `campus_visits`, `telecallers`, enables RLS and drops the `allow_all`
+(true/true) policies. **Do not apply until dce_crm (the Streamlit Cloud app, `scheduler.py`,
+and any other consumer) runs on a server-side `service_role` key** - with the anon key it
+stops working the moment this lands.
+
+Tooling in `migrations/0016_tools/` (reuses `migrations/0015_tools/_common.py`):
+
+```
+python migrations/0016_tools/snapshot_tier2.py --env dev     # BEFORE apply -> migrations/rollback/0016_rollback_dev.sql
+python migrations/0016_tools/verify_tier2_lockdown.py --env dev                      # after apply (dev: incl. rolled-back default-privileges test)
+python migrations/0016_tools/verify_tier2_lockdown.py --env prod --read-only-only    # prod: read-only checks
+python migrations/0015_tools/anon_probe.py --env <env>       # after: every table denied
+python migrations/0016_tools/rpc_probe.py --env dev          # DEV ONLY: can anon call the 4 trigger functions via /rpc ?
+```
+
+Planned order: dev copy of dce_crm on the dev anon key (baseline) -> dev secret key
+(same behaviour) -> dev snapshot + apply 0016 -> verify + probe -> prod key swap in
+Streamlit Cloud and the scheduler -> confirm dce_crm works on prod -> prod snapshot
++ apply. A `REVOKE EXECUTE` on the trigger functions is separate and only written if
+`rpc_probe.py` shows they are reachable.
