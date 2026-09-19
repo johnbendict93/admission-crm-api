@@ -37,12 +37,18 @@ param(
     [switch] $EnableEmail,
     [switch] $SkipVenv,
 
-    [string] $ApiDir  = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path,
-    [string] $ProdDir = (Join-Path (Split-Path -Parent $ApiDir) 'dce_crm'),
-    [string] $DevDir  = (Join-Path (Split-Path -Parent $ApiDir) 'dce_crm_dev')
+    [string] $ApiDir  = '',
+    [string] $ProdDir = '',
+    [string] $DevDir  = ''
 )
 
 $ErrorActionPreference = 'Stop'
+
+# Defaults are resolved here, not in param(): $PSScriptRoot is empty inside param() defaults in Windows PowerShell 5.1.
+$scriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
+if (-not $ApiDir)  { $ApiDir  = (Resolve-Path (Join-Path $scriptDir '../..')).Path }
+if (-not $ProdDir) { $ProdDir = Join-Path (Split-Path -Parent $ApiDir) 'dce_crm' }
+if (-not $DevDir)  { $DevDir  = Join-Path (Split-Path -Parent $ApiDir) 'dce_crm_dev' }
 
 function Fail([string]$Message) { Write-Host "ABORT: $Message" -ForegroundColor Red; exit 1 }
 function Step([string]$Message) { Write-Host "`n=== $Message" -ForegroundColor Cyan }
