@@ -95,3 +95,41 @@ python migrations/run_migrations.py stamp --env prod --version 0001
 `stamp` also prompts for confirmation on `--env prod`. Every migration
 after 0001 is a genuinely new, not-yet-applied change and goes through
 `apply` normally, on dev first and then, once verified, on prod.
+
+## Migration 0015: Tier 1 anon/authenticated lockdown
+
+Revokes every privilege from `anon` and `authenticated` on the twelve tables
+only the API touches (the API uses service_role), enables RLS on them, drops
+their literal-`true` policies, and stops future tables in `public` from
+auto-granting to those roles. The five tables `dce_crm` still reads with the
+anon key (`leads, followups, call_schedules, campus_visits, telecallers`) are
+deliberately NOT touched - they are locked down later, after `dce_crm` has
+been moved to a server-side service key. Tooling lives in
+`migrations/0015_tools/`; the migration header explains the reasoning.
+
+Run order, **dev first, prod only after the dev output has been reviewed**
+(each step is read-only unless it says APPLY):
+
+```
+python check_0015_preflight.py --env dev                       # facts: function owner, follow_ups, runner role
+python migrations/0015_tools/anon_probe.py --env dev --write-probe   # BEFORE: anon can read/write everything
+python migrations/0015_tools/snapshot_state.py --env dev       # writes migrations/rollback/0015_rollback_dev.sql
+python migrations/run_migrations.py apply --env dev            # APPLY (dev)
+python migrations/0015_tools/verify_lockdown.py --env dev      # 61 checks; includes two rolled-back write tests
+python migrations/0015_tools/anon_probe.py --env dev --write-probe   # AFTER: Tier 1 denied, Tier 2 still open
+pytest                                                         # full suite (216)
+```
+
+Prod (by hand, with the typed confirmation): take a **prod** snapshot first
+(`snapshot_state.py --env prod` - never reuse dev's rollback file, the two
+states differ: prod has RLS off on five of these tables), run the read-only
+`anon_probe.py --env prod`, then `run_migrations.py apply --env prod`, then
+`verify_lockdown.py --env prod --read-only-only` and the prod probe again.
+To roll back, run the matching `migrations/rollback/0015_rollback_<env>.sql`
+against that environment as one transaction, then delete the `0015` row from
+`schema_migrations` so the migration shows as pending again.
+
+Side effect on prod: `dce_crm/verify_live_deployed_app.py` and
+`verify_soft_delete_visibility_fix.py` read `users` with the anon key and will
+stop working (they are one-off scripts, not app code).
+
