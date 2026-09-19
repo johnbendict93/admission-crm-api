@@ -1,0 +1,29 @@
+from typing import Optional
+from uuid import UUID
+
+from pydantic import BaseModel
+
+
+class UserResponse(BaseModel):
+    """Read-only, deliberately slim view of public.users for pickers and
+    display (e.g. counseling_sessions.counselor_id). Only these five
+    columns are ever selected from the database (see users_service.py's
+    USER_COLUMNS) - email, phone and avatar_url are never fetched, so they
+    cannot leak through this API even by accident.
+
+    Matches the real public.users table (confirmed live on dev AND prod,
+    Sept 2026, via information_schema.columns): id uuid NOT NULL,
+    full_name text NOT NULL, role text NOT NULL (DB CHECK: admin /
+    counselor / staff / viewer - kept as free text here, not a Literal, so
+    the DB stays the single source of truth for the allowed values),
+    department text NULL, is_active boolean NULL (DB default true).
+    """
+
+    id: UUID
+    full_name: str
+    role: str
+    department: Optional[str] = None
+    is_active: Optional[bool] = None
+
+    class Config:
+        from_attributes = True

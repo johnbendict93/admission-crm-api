@@ -192,6 +192,18 @@ def counseling_sessions_table():
     return settings.COUNSELING_SESSIONS_TABLE
 
 
+@pytest.fixture(scope="session")
+def users_table():
+    return settings.USERS_TABLE
+
+
+@pytest.fixture(scope="session")
+def settings_test_admin_email():
+    """The admin test account's email straight from config - lets tests
+    assert that address never leaks into an API response."""
+    return settings.TEST_ADMIN_EMAIL
+
+
 def count_rows(supabase, table_name: str) -> int:
     response = supabase.table(table_name).select("id").execute()
     return len(response.data)
