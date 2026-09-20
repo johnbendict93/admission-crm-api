@@ -134,19 +134,41 @@ Side effect on prod: `dce_crm/verify_live_deployed_app.py` and
 stop working (they are one-off scripts, not app code).
 
 
-## Migration 0016 (DRAFT, NOT APPLIED): Tier 2 anon/authenticated lockdown
+## Migration 0016 (APPLIED dev 2026-09-19, prod 2026-09-20): Tier 2 anon/authenticated lockdown
 
-**Status: draft. Not applied to dev or prod.** The file is
-`migrations/pending/0016_lock_down_tier2_anon_access.sql` - deliberately outside
-`migrations/*.sql`, which is all `run_migrations.py` discovers, so no `apply` run can
-pick it up by accident. To release it, `git mv` it into `migrations/` in the same change
-that applies it.
+**Status: APPLIED.** Dev: 2026-09-19 17:03:29 UTC. Prod: 2026-09-20 07:20:51 UTC (0017 one
+second later). The file is `migrations/0016_lock_down_tier2_anon_access.sql` (released from
+`migrations/pending/` by commit `db97a37`).
 
 It revokes ALL from `anon` and `authenticated` on `leads`, `followups`,
 `call_schedules`, `campus_visits`, `telecallers`, enables RLS and drops the `allow_all`
-(true/true) policies. **Do not apply until dce_crm (the Streamlit Cloud app, `scheduler.py`,
-and any other consumer) runs on a server-side `service_role` key** - with the anon key it
-stops working the moment this lands.
+(true/true) policies. It had to wait until every dce_crm consumer ran on a server-side
+`service_role` key - with the anon key dce_crm stops working the moment this lands.
+
+**Applied record**
+
+- Rollback files (generated from the LIVE db BEFORE apply, both committed):
+  `migrations/rollback/0016_rollback_dev.sql` (commit `db97a37`) and
+  `migrations/rollback/0016_rollback_prod.sql` (commit `846cc92`). Both carry
+  `STATE_FINGERPRINT=bc797b0f46bd3ed12f81b155c1cb65ed793ef083769d5f3f24ac8ec35351db4e`
+  (dev and prod Tier 2 started in the identical state). To roll back, run the matching
+  file for the SAME environment as one transaction (Supabase SQL editor), then delete the
+  0016 row from `schema_migrations`.
+- Dev: `verify_tier2_lockdown.py --env dev` 49/49; `anon_probe.py --env dev --write-probe`
+  all 17 tables denied (12 x 401/42501, 5 x 500/42P17 which is the harmless `users`
+  policy recursion), row counts unchanged.
+- Prod: `verify_tier2_lockdown.py --env prod --read-only-only` 48/48; `anon_probe.py --env prod`
+  same 17-table pattern; service_role row counts unchanged (leads 5, followups 1,
+  call_schedules 1, campus_visits 0, telecallers 0).
+- dce_crm on both stages behaved the same: five Tier 2 pages load, writes save (incl. an
+  offset-aware call_schedules write stored as the correct UTC instant), and the daily report
+  sends with live counts. Prod's Streamlit Cloud `SUPABASE_KEY` was swapped to the prod
+  `service_role` JWT before 0016 and the live app kept working after it.
+- `scheduler.py` is NOT running for prod (the prod sender's Sent folder has only the Sep 4
+  test reports). If it is ever started it must use the `service_role` key too.
+- Still on the anon key (will fail against the locked tables until swapped): the local
+  prod copy's `.streamlit/secrets.toml`, and the untracked `verify_*.py` one-off scripts in
+  dce_crm. The API itself uses the anon key only for `sign_in_with_password` (auth, unaffected).
 
 Tooling in `migrations/0016_tools/` (reuses `migrations/0015_tools/_common.py`):
 
@@ -163,17 +185,17 @@ Planned order: dev copy of dce_crm on the dev anon key (baseline) -> dev secret 
 Streamlit Cloud and the scheduler -> confirm dce_crm works on prod -> prod snapshot
 + apply.
 
-### Migration 0017 (DRAFT, NOT APPLIED): revoke anon EXECUTE on `rls_auto_enable()`
+### Migration 0017 (APPLIED dev 2026-09-19, prod 2026-09-20; no-op on prod): revoke anon EXECUTE on `rls_auto_enable()`
 
 `rpc_probe.py` on dev: the four trigger functions are NOT exposed over REST (404 /
 PGRST202) so they need nothing; `public.rls_auto_enable()` (event trigger,
 SECURITY DEFINER, present on dev only) IS reachable (400 / 0A000 - it is invoked, then
-refuses). `migrations/pending/0017_revoke_anon_execute_rls_auto_enable.sql` revokes
+refuses). `migrations/0017_revoke_anon_execute_rls_auto_enable.sql` revokes
 EXECUTE from PUBLIC/anon/authenticated, guarded so it is a no-op where the function does
 not exist. Independent of 0016 (no dce_crm dependency). Check owner/ACL first
 (`check_tier2_audit.py`, section 6).
 
-### dce_crm dev rehearsal (before 0016): `migrations/0016_tools/setup_dce_crm_dev.ps1`
+### dce_crm dev rehearsal (done before 0016): `migrations/0016_tools/setup_dce_crm_dev.ps1`
 
 Builds `..\dce_crm_dev` (a remote-less clone of dce_crm) with a dev-only
 `.streamlit\secrets.toml`: dev URL + key from this repo's `.env` (never printed),
