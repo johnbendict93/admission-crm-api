@@ -46,7 +46,19 @@ openapi_tags = [
     {"name": "Users", "description": "Staff directory (active users) for pickers such as a counseling session's counselor, plus admin-only user creation. Email and phone are never exposed."},
 ]
 
-app = FastAPI(title="Admission CRM API", version="0.1.0", openapi_tags=openapi_tags)
+# Interactive docs (/docs, /redoc) and the schema (/openapi.json) list every
+# endpoint, so they are switched off in production and stay on in development.
+# Driven by ENVIRONMENT (set on Render); no hardcoded URLs or flags.
+_docs_enabled = settings.ENVIRONMENT != "production"
+
+app = FastAPI(
+    title="Admission CRM API",
+    version="0.1.0",
+    openapi_tags=openapi_tags,
+    docs_url="/docs" if _docs_enabled else None,
+    redoc_url="/redoc" if _docs_enabled else None,
+    openapi_url="/openapi.json" if _docs_enabled else None,
+)
 
 # Origins come from ALLOWED_ORIGINS in .env — add your real Vercel URL there
 # once the Next.js frontend is deployed, no code change needed.
