@@ -12,6 +12,9 @@ unlike every prior module, telecallers has no FK to another table, so
 fixtures here need no existing_applicant-style dependency.
 """
 import pytest
+from pydantic import ValidationError
+
+from app.models.telecallers import TelecallerCreate, TelecallerResponse
 
 
 @pytest.fixture
@@ -187,3 +190,53 @@ class TestDeleteTelecaller:
             assert second.status_code == 404
         finally:
             supabase.table(telecallers_table).delete().eq("id", telecaller_id).execute()
+
+
+class TestBlankEmailRegression:
+    """A telecaller row with email = '' (found on dev, Sept 2026) must not
+    crash the list/get endpoints - same bug class as leads."""
+
+    @staticmethod
+    def _base(email):
+        return {
+            "id": "00000000-0000-0000-0000-000000000001",
+            "name": "Blank Email Test",
+            "email": email,
+        }
+
+    @pytest.mark.parametrize("blank", ["", " ", "   ", "\t"])
+    def test_response_model_turns_blank_email_into_none(self, blank):
+        assert TelecallerResponse(**self._base(blank)).email is None
+
+    def test_response_model_keeps_valid_and_missing_email(self):
+        assert (
+            TelecallerResponse(**self._base("a@example.com")).email
+            == "a@example.com"
+        )
+        assert TelecallerResponse(**self._base(None)).email is None
+
+    def test_response_model_still_rejects_a_malformed_email(self):
+        with pytest.raises(ValidationError):
+            TelecallerResponse(**self._base("not-an-email"))
+
+    def test_create_model_stays_strict_about_blank_email(self):
+        with pytest.raises(ValidationError):
+            TelecallerCreate(name="X", email="")
+
+    def test_list_and_get_survive_a_row_with_blank_email(
+        self, client, supabase, telecallers_table
+    ):
+        row = (
+            supabase.table(telecallers_table)
+            .insert({"name": "Pytest Blank Email Telecaller", "email": ""})
+            .execute()
+            .data[0]
+        )
+        try:
+            got = client.get(f"/telecallers/{row['id']}")
+            assert got.status_code == 200
+            assert got.json()["email"] is None
+            listed = client.get("/telecallers/?limit=200&offset=0")
+            assert listed.status_code == 200
+        finally:
+            supabase.table(telecallers_table).delete().eq("id", row["id"]).execute()

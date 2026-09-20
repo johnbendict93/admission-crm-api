@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 
 
 class TelecallerBase(BaseModel):
@@ -29,6 +29,15 @@ class TelecallerCreate(TelecallerBase):
 class TelecallerResponse(TelecallerBase):
     id: UUID
     created_at: Optional[datetime] = None
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def blank_email_to_none(cls, v):
+        """Old rows may hold email = ''; treat as no email so one bad row
+        does not 500 the whole list. Create/update models stay strict."""
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
 
     class Config:
         from_attributes = True
