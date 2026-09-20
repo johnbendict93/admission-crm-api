@@ -1,4 +1,4 @@
-"""Tests for the read-only /users module (GET list, GET /{id}). Field
+"""Tests for the /users module (GET list, GET /{id}, POST create). Field
 names come from app/models/users.py (UserResponse) and
 app/routers/users.py.
 
@@ -246,12 +246,107 @@ class TestUsersAuth:
         assert viewer_client.get("/users/").status_code == 200
         assert viewer_client.get(f"/users/{admin_user_id}").status_code == 200
 
-    def test_module_is_read_only(self, client, admin_user_id):
-        assert client.post("/users/", json={"email": "x@example.com"}).status_code == 405
+    def test_edit_and_delete_are_not_offered_yet(self, client, admin_user_id):
+        # Only create (POST) exists so far; PATCH/DELETE come later.
         assert client.patch(f"/users/{admin_user_id}", json={"role": "viewer"}).status_code == 405
         assert client.delete(f"/users/{admin_user_id}").status_code == 405
+
+
+class TestCreateUser:
+    """POST /users - admin only. Uses the real Supabase Auth admin API on
+    dev, so every login it creates is deleted again by the fixture below."""
+
+    @pytest.fixture
+    def new_user_payload(self, supabase, users_table):
+        email = f"pytest-{uuid.uuid4().hex[:12]}@example.com"
+        payload = {
+            "email": email,
+            "full_name": "Pytest Created User",
+            "role": "counselor",
+            "department": "PytestDept",
+            "temporary_password": "Temp-" + uuid.uuid4().hex[:12],
+        }
+        yield payload
+        # Teardown: remove the login (and the users row, in case it does not cascade).
+        rows = supabase.table(users_table).select("id").eq("email", email).execute().data
+        for row in rows:
+            try:
+                supabase.auth.admin.delete_user(row["id"])
+            except Exception:
+                pass
+            supabase.table(users_table).delete().eq("id", row["id"]).execute()
+
+    def test_admin_creates_user_and_role_is_applied(self, client, new_user_payload):
+        response = client.post("/users/", json={**new_user_payload, "role": "viewer"})
+        assert response.status_code == 201, response.text
+        body = response.json()
+        assert set(body) == SLIM_FIELDS
+        assert body["role"] == "viewer"  # trigger default is counselor; API must override it
+        assert body["department"] == "PytestDept"
+        assert body["full_name"] == "Pytest Created User"
+        assert body["is_active"] is True
+        assert "@" not in response.text
+        assert new_user_payload["temporary_password"] not in response.text
+
+    def test_new_user_can_log_in_with_temporary_password(self, client, new_user_payload):
+        assert client.post("/users/", json=new_user_payload).status_code == 201
+        login = client.post(
+            "/auth/login",
+            json={"email": new_user_payload["email"], "password": new_user_payload["temporary_password"]},
+            headers={"Authorization": ""},
+        )
+        assert login.status_code == 200, login.text
+        assert login.json()["user"]["role"] == "counselor"
+
+    def test_duplicate_email_returns_409(self, client, new_user_payload):
+        assert client.post("/users/", json=new_user_payload).status_code == 201
+        second = client.post("/users/", json=new_user_payload)
+        assert second.status_code == 409
+
+    @pytest.mark.parametrize("bad_role", ["admin", "superuser", ""])
+    def test_role_not_allowed_returns_422(self, client, new_user_payload, bad_role):
+        assert client.post("/users/", json={**new_user_payload, "role": bad_role}).status_code == 422
+
+    def test_short_password_returns_422(self, client, new_user_payload):
+        assert client.post("/users/", json={**new_user_payload, "temporary_password": "short"}).status_code == 422
+
+    def test_bad_email_and_blank_name_return_422(self, client, new_user_payload):
+        assert client.post("/users/", json={**new_user_payload, "email": "not-an-email"}).status_code == 422
+        assert client.post("/users/", json={**new_user_payload, "full_name": "   "}).status_code == 422
+
+    def test_viewer_cannot_create_returns_403(self, viewer_client, new_user_payload):
+        assert viewer_client.post("/users/", json=new_user_payload).status_code == 403
+
+    def test_without_token_returns_401(self, client, new_user_payload):
+        assert client.post("/users/", json=new_user_payload, headers={"Authorization": ""}).status_code == 401
+
+
+class TestCreateUserRollback:
+    """No network: proves a login is deleted again if the users-row fix-up fails."""
+
+    def test_login_is_deleted_when_row_update_fails(self):
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock
+
+        from app.models.users import UserCreate
+        from app.services import users_service
+
+        fake = MagicMock()
+        fake.auth.admin.create_user.return_value = SimpleNamespace(user=SimpleNamespace(id="new-id"))
+        fake.table.return_value.update.return_value.eq.return_value.execute.side_effect = RuntimeError("boom")
+        data = UserCreate(
+            email="rollback@example.com",
+            full_name="Rollback Test",
+            role="staff",
+            temporary_password="Temp-password-1",
+        )
+        with pytest.raises(RuntimeError):
+            users_service.create_user(fake, data)
+        fake.auth.admin.delete_user.assert_called_once_with("new-id")
 
 
 def test_fixtures_leave_no_rows_behind(supabase, users_table):
     leftovers = supabase.table(users_table).select("id").like("email", "pytest-%@pytest.invalid").execute().data
     assert leftovers == []
+    created = supabase.table(users_table).select("id").like("email", "pytest-%@example.com").execute().data
+    assert created == []

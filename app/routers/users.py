@@ -3,11 +3,12 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from postgrest.exceptions import APIError
 from supabase import Client
+from supabase_auth.errors import AuthApiError
 
 from app.core.database import get_supabase_client
-from app.core.jwt_auth import get_current_user
+from app.core.jwt_auth import get_current_user, require_admin
 from app.models.pagination import PaginatedResponse
-from app.models.users import UserResponse
+from app.models.users import UserCreate, UserResponse
 from app.services import users_service
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -62,3 +63,22 @@ def get_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
+
+
+@router.post("/", response_model=UserResponse, status_code=201)
+def create_user(
+    body: UserCreate,
+    supabase: Client = Depends(get_supabase_client),
+    current_user: dict = Depends(require_admin),
+):
+    """Create a staff login (admin only). The admin supplies a temporary
+    password; the person should change it after first login. Roles allowed:
+    counselor, staff, viewer (never admin). Email and phone are not returned."""
+    try:
+        return users_service.create_user(supabase, body)
+    except users_service.EmailAlreadyExists:
+        raise HTTPException(status_code=409, detail="A user with this email already exists")
+    except AuthApiError as e:
+        raise HTTPException(status_code=400, detail=f"Could not create login: {e.message}")
+    except APIError as e:
+        raise HTTPException(status_code=400, detail=f"Database error: {e.message}")

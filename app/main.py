@@ -43,7 +43,7 @@ openapi_tags = [
     {"name": "Followups", "description": "Logged follow-up calls made to a lead."},
     {"name": "Settings", "description": "Key/value application configuration, grouped by category."},
     {"name": "Counseling Sessions", "description": "Logged counseling sessions between a counselor and an applicant."},
-    {"name": "Users", "description": "Read-only staff directory (active users) for pickers such as a counseling session's counselor. Email and phone are never exposed."},
+    {"name": "Users", "description": "Staff directory (active users) for pickers such as a counseling session's counselor, plus admin-only user creation. Email and phone are never exposed."},
 ]
 
 app = FastAPI(title="Admission CRM API", version="0.1.0", openapi_tags=openapi_tags)

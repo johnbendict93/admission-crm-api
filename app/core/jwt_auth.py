@@ -138,3 +138,14 @@ def require_deleter(current_user: dict = Depends(get_current_user)) -> dict:
             detail="Only admin or staff roles may delete records",
         )
     return current_user
+
+
+def require_admin(current_user: dict = Depends(get_current_user)) -> dict:
+    """Only the admin role may manage user accounts (create/edit/deactivate).
+    Stricter than require_deleter, which also lets staff through."""
+    if current_user["role"] != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the admin role may manage users",
+        )
+    return current_user
