@@ -1,0 +1,22 @@
+-- Migration 0018: add leads.parent_phone (optional)
+--
+-- WHY
+--   Enquiries record the parent's contact number separately from the
+--   student's. leads only had one phone column; applicants already has
+--   parent_phone. Needed for the fake-data generator and later ML modules
+--   (parent reachability / follow-up timing).
+--
+-- SAFETY (cross-app check done before writing this)
+--   * Nullable text, no default, no constraint: existing rows get NULL and
+--     every existing writer keeps working unchanged. The Streamlit app
+--     inserts dicts without this key (dce_crm/utils/db.py) and reads with
+--     select("*"), so the extra column is simply ignored there.
+--   * Column-level privileges follow the table's grants; the 0015/0016
+--     lockdown (anon/authenticated denied on leads) still applies.
+--   * Apply to DEV first, verify, then PROD. Apply BEFORE deploying the API
+--     code that selects parent_phone (LEAD_COLUMNS), otherwise /leads 400s.
+--
+-- ROLLBACK: migrations/rollback/0018_rollback_dev.sql / 0018_rollback_prod.sql
+--   (drops the column; loses any parent_phone values written since).
+
+ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS parent_phone text;

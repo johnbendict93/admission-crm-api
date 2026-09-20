@@ -82,6 +82,7 @@ class TestCreateLead:
             "phone": "9999999999",
             "email": "pytest.lead@example.com",
             "school": "Pytest HSS",
+            "parent_phone": "9888888888",
             "status": "New",
         }
         created_id = None
@@ -94,6 +95,7 @@ class TestCreateLead:
             assert body["phone"] == payload["phone"]
             assert body["email"] == payload["email"]
             assert body["school"] == payload["school"]
+            assert body["parent_phone"] == payload["parent_phone"]
             assert body["status"] == payload["status"]
             assert "id" in body and "created_at" in body
         finally:

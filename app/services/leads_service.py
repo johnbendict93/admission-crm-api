@@ -15,7 +15,7 @@ TABLE_NAME = settings.LEADS_TABLE
 # returns, and any accidental extra column added later doesn't silently leak.
 LEAD_COLUMNS = (
     "id,name,phone,email,school,district,marks,course_interest,"
-    "parent_name,parent_occupation,source,status,score,assigned_to,created_at"
+    "parent_name,parent_phone,parent_occupation,source,status,score,assigned_to,created_at"
 )
 
 

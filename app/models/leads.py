@@ -14,6 +14,7 @@ class LeadBase(BaseModel):
     marks: Optional[float] = None
     course_interest: Optional[str] = None
     parent_name: Optional[str] = None
+    parent_phone: Optional[str] = None
     parent_occupation: Optional[str] = None
     source: Optional[str] = None           # e.g. Walk-in, Referral
     status: Optional[str] = "New"          # matches existing data convention
@@ -53,6 +54,7 @@ class LeadUpdate(BaseModel):
     marks: Optional[float] = None
     course_interest: Optional[str] = None
     parent_name: Optional[str] = None
+    parent_phone: Optional[str] = None
     parent_occupation: Optional[str] = None
     source: Optional[str] = None
     status: Optional[str] = None
