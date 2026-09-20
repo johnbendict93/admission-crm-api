@@ -4,6 +4,11 @@ Field names below come directly from app/models/leads.py (LeadBase) and
 app/routers/leads.py — read before writing these tests, not guessed.
 """
 
+import pytest
+from pydantic import ValidationError
+
+from app.models.leads import LeadCreate, LeadResponse
+
 
 class TestListLeads:
     def test_list_returns_200(self, client):
@@ -200,3 +205,48 @@ class TestDeleteLead:
             assert second.status_code == 404
         finally:
             supabase.table(leads_table).delete().eq("id", lead_id).execute()
+
+
+class TestBlankEmailRegression:
+    """Regression for the Sept 2026 outage: two dev rows held email = ''
+    (the Streamlit form saves an empty box as an empty string). The strict
+    EmailStr on LeadResponse rejected them while serializing GET /leads/,
+    so ONE bad row returned a 500 for the whole list.
+
+    Fix (commit 7aff751): LeadResponse turns a blank/whitespace email into
+    None on the way OUT. Create/update models stay strict on purpose."""
+
+    def _base(self):
+        return {"id": "00000000-0000-0000-0000-000000000001", "name": "A", "phone": "5000000000"}
+
+    @pytest.mark.parametrize("blank", ["", " ", "   ", "\t"])
+    def test_response_model_turns_blank_email_into_none(self, blank):
+        assert LeadResponse(**self._base(), email=blank).email is None
+
+    def test_response_model_keeps_valid_email_and_missing_email(self):
+        assert LeadResponse(**self._base(), email="a@example.com").email == "a@example.com"
+        assert LeadResponse(**self._base()).email is None
+
+    def test_response_model_still_rejects_a_malformed_email(self):
+        with pytest.raises(ValidationError):
+            LeadResponse(**self._base(), email="not-an-email")
+
+    def test_create_model_stays_strict_about_blank_email(self):
+        with pytest.raises(ValidationError):
+            LeadCreate(name="A", phone="5000000000", email="")
+
+    def test_list_and_get_survive_a_row_with_blank_email(self, client, supabase, leads_table):
+        lead_id = (
+            supabase.table(leads_table)
+            .insert({"name": "Pytest Blank Email", "phone": "5000000999", "email": ""})
+            .execute()
+        ).data[0]["id"]
+        try:
+            single = client.get(f"/leads/{lead_id}")
+            assert single.status_code == 200
+            assert single.json()["email"] is None
+            listing = client.get("/leads/?limit=200&offset=0")
+            assert listing.status_code == 200
+        finally:
+            supabase.table(leads_table).delete().eq("id", lead_id).execute()
+
