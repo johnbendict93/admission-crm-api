@@ -24,9 +24,10 @@ Usage (from the API repo root, in the conda env):
     python scripts/seed_dev_fake_leads.py --delete --apply   # really delete the fake rows
 
 NOTE ON REALISM: the TN cut-off formula (Maths + Physics/2 + Chemistry/2, out
-of 200) is the real one. The distributions below (district mix, enquiry
-seasonality, source mix, conversion odds) are hand-set assumptions, NOT yet
-calibrated to official TNEA / DGE statistics. Fine for demos and pipeline
+of 200) is the real one. The course-interest mix is calibrated to public
+state-wide TNEA 2026 branch shares (see COURSES). The other distributions
+(district mix, enquiry seasonality, source mix, conversion odds) are still
+hand-set assumptions, NOT yet calibrated to official TNEA / DGE statistics. Fine for demos and pipeline
 tests; do not quote model accuracy from this data as if it were real.
 """
 import argparse
@@ -74,8 +75,16 @@ SCHOOL_KINDS = ["Govt. Hr. Sec. School", "Govt. Boys Hr. Sec. School", "Govt. Gi
                 "Adarsh Vidyalaya Matric. Hr. Sec. School"]
 STREETS = ["Gandhi Street", "Nehru Nagar", "Anna Salai", "Kamaraj Road", "Periyar Street", "Bharathi Nagar", "Ambedkar Street"]
 
-COURSES = [("B.E. Computer Science", 26), ("B.E. AI & Data Science", 22), ("B.E. Electronics & Communication", 14),
-           ("B.E. Electrical & Electronics", 8), ("B.E. Mechanical", 10), ("B.E. Civil", 6), ("Other", 6)]
+# Course-interest mix, calibrated (Sept 2026) to PUBLIC state-wide TNEA 2026 seat
+# shares (secondary sources quoting tneaonline.org; the official site was not
+# reachable): CSE ~31%, AI&DS+AI&ML ~12%, ECE ~14%, EEE ~7%, Mech ~10%, Civil ~5%,
+# IT+Biomedical+other ~22%. AI&DS is deliberately kept above its seat share (target
+# 16%) because it is a high-demand branch DCE teaches. The base weights below are
+# tuned so the REALISED mix (after the marks>80 boost for CS/AI further down) lands
+# on: CS 31 / AI&DS 16 / ECE 14 / EEE 7 / Mech 10 / Civil 5 / Other 17.
+# Seat share is supply, not enquiry demand - treat this as a plausibility anchor.
+COURSES = [("B.E. Computer Science", 28.6), ("B.E. AI & Data Science", 14.6), ("B.E. Electronics & Communication", 15.1),
+           ("B.E. Electrical & Electronics", 7.1), ("B.E. Mechanical", 10.9), ("B.E. Civil", 5.2), ("Other", 18.5)]
 # MBA / MCA are deliberately left out: these are 12th-standard students, who do not enquire for PG courses.
 OCCUPATIONS = [("Government Employee", 12, 0.10), ("Private Employee", 28, 0.0), ("Business", 20, 0.15),
                ("Farmer", 22, -0.10), ("Daily Wage", 14, -0.15), ("Other", 4, 0.0)]
@@ -226,6 +235,8 @@ def print_report(leads, applicants, show):
     from collections import Counter
     print("Status  :", dict(Counter(l["status"] for l in leads)))
     print("Source  :", dict(Counter(l["source"] for l in leads).most_common()))
+    course_counts = Counter(l["course_interest"] for l in leads).most_common()
+    print("Course  :", {c: f"{n} ({100 * n / len(leads):.0f}%)" for c, n in course_counts})
     print("District:", dict(Counter(l["district"] for l in leads).most_common(6)), "...")
     by_month = Counter(l["created_at"][:7] for l in leads)
     print("By month:", dict(sorted(by_month.items())))
