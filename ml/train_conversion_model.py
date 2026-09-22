@@ -40,11 +40,16 @@ from ml.pipeline import RANDOM_STATE, build_pipeline
 
 
 def load_dev_leads() -> list[dict]:
+    """ORDER BY id: without an explicit order, Postgres can return rows in a
+    different physical order between runs even when nothing changed, which
+    silently shifts which rows train_test_split's fixed RANDOM_STATE puts in
+    train vs. test - making metrics non-reproducible run to run for reasons
+    that have nothing to do with the model. Ordering by id fixes that."""
     conn = psycopg2.connect(settings.DEV_DATABASE_URL)
     conn.set_session(readonly=True, autocommit=True)
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cols = ", ".join(TRAINING_SELECT_COLUMNS)
-    cur.execute(f"SELECT {cols} FROM public.leads;")
+    cur.execute(f"SELECT {cols} FROM public.leads ORDER BY id;")
     rows = [dict(r) for r in cur.fetchall()]
     cur.close()
     conn.close()
