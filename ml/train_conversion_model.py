@@ -3,11 +3,21 @@
 Label: status == 'Enrolled' vs everything else (confirmed with John,
 2026-09-22 - see ml/features.py POSITIVE_STATUS). Reads all dev leads via
 DEV_DATABASE_URL (same connection pattern as the repo's check_*.py audit
-scripts), trains a Logistic Regression pipeline (class_weight='balanced' -
-positive rate is ~18%, chosen over XGBoost for this dataset size: 507 rows
-is small enough that XGBoost's extra variance isn't worth it yet), evaluates
-on a held-out stratified split, and saves the fitted pipeline to
-settings.CONVERSION_MODEL_PATH (never hardcoded - see app/core/config.py).
+scripts) and trains a Logistic Regression pipeline (class_weight='balanced' -
+positive rate is ~20%; LogisticRegressionCV picks its own regularization
+strength, see ml/pipeline.py).
+
+EVALUATION (revised 2026-09-22, see commit after fb90f75): this used to
+report a single held-out 80/20 split. With only ~99 positive (Enrolled)
+rows total, that single split's ROC-AUC swung from ~0.39 to ~0.68 purely
+from which ~20 positives happened to land in the test 20% - confirmed by
+rerunning the same model on the same data across 10 different splits
+(mean 0.537, std 0.087, range 0.39-0.68). That is not a trustworthy number
+to quote, to John or to a buyer. Instead this now reports 5-fold stratified
+cross-validation (every row used as test exactly once, mean +/- std) as the
+real performance estimate, and fits the FINAL deployed model on ALL rows
+(not just 80% of them) - once CV has already given an honest generalization
+estimate, holding out a test set for the deployed model just wastes data.
 
 Run this yourself (needs your conda env / network - dev Supabase isn't
 reachable from the cloud sandbox or the local Cowork shell):
@@ -23,28 +33,22 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import joblib
 import psycopg2
 import psycopg2.extras
-from sklearn.metrics import (
-    accuracy_score,
-    classification_report,
-    confusion_matrix,
-    f1_score,
-    precision_score,
-    recall_score,
-    roc_auc_score,
-)
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedKFold, cross_validate
 
 from app.core.config import settings
 from ml.features import TRAINING_SELECT_COLUMNS, make_label, rows_to_frame
 from ml.pipeline import RANDOM_STATE, build_pipeline
 
+CV_FOLDS = 5
+CV_SCORING = ["roc_auc", "accuracy", "precision", "recall", "f1"]
+
 
 def load_dev_leads() -> list[dict]:
     """ORDER BY id: without an explicit order, Postgres can return rows in a
     different physical order between runs even when nothing changed, which
-    silently shifts which rows train_test_split's fixed RANDOM_STATE puts in
-    train vs. test - making metrics non-reproducible run to run for reasons
-    that have nothing to do with the model. Ordering by id fixes that."""
+    would silently change which rows land in which CV fold - making metrics
+    non-reproducible run to run for reasons that have nothing to do with the
+    model. Ordering by id fixes that."""
     conn = psycopg2.connect(settings.DEV_DATABASE_URL)
     conn.set_session(readonly=True, autocommit=True)
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
@@ -73,37 +77,28 @@ def main() -> None:
     y = [make_label(r["status"]) for r in rows]
     print(f"Label balance: {sum(y)} Enrolled / {len(y) - sum(y)} other")
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, stratify=y, random_state=RANDOM_STATE
-    )
+    skf = StratifiedKFold(n_splits=CV_FOLDS, shuffle=True, random_state=RANDOM_STATE)
+    cv = cross_validate(build_pipeline(), X, y, cv=skf, scoring=CV_SCORING)
 
+    metrics = {"n_rows": len(rows), "n_positive": sum(y), "cv_folds": CV_FOLDS}
+    print(f"\n-- {CV_FOLDS}-fold cross-validated metrics (each row used as test exactly once) --")
+    for name in CV_SCORING:
+        scores = cv[f"test_{name}"]
+        metrics[f"cv_{name}_mean"] = scores.mean()
+        metrics[f"cv_{name}_std"] = scores.std()
+        metrics[f"cv_{name}_folds"] = scores.tolist()
+        print(f"{name:10}: mean={scores.mean():.3f}  std={scores.std():.3f}  folds={[round(s, 3) for s in scores]}")
+
+    # Final deployed model: fit on ALL available data. CV above already gave
+    # the honest out-of-sample estimate; the model that actually serves
+    # predictions should use every row it can.
     pipeline = build_pipeline()
-    pipeline.fit(X_train, y_train)
-
-    y_pred = pipeline.predict(X_test)
-    y_proba = pipeline.predict_proba(X_test)[:, 1]
-
-    metrics = {
-        "n_train": len(X_train),
-        "n_test": len(X_test),
-        "accuracy": accuracy_score(y_test, y_pred),
-        "precision": precision_score(y_test, y_pred, zero_division=0),
-        "recall": recall_score(y_test, y_pred, zero_division=0),
-        "f1": f1_score(y_test, y_pred, zero_division=0),
-        "roc_auc": roc_auc_score(y_test, y_proba),
-        "confusion_matrix": confusion_matrix(y_test, y_pred).tolist(),
-    }
-
-    print("\n-- Test set metrics --")
-    for k, v in metrics.items():
-        print(f"{k}: {v}")
-    print("\n-- Full classification report --")
-    print(classification_report(y_test, y_pred, target_names=["Not Enrolled", "Enrolled"], zero_division=0))
+    pipeline.fit(X, y)
 
     model_path = Path(__file__).resolve().parent.parent / settings.CONVERSION_MODEL_PATH
     model_path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(pipeline, model_path)
-    print(f"\nSaved model to {model_path}")
+    print(f"\nSaved model (trained on all {len(rows)} rows) to {model_path}")
 
     metrics_path = model_path.with_suffix(".metrics.json")
     with open(metrics_path, "w", encoding="utf-8") as f:
