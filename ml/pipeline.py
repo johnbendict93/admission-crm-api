@@ -1,7 +1,11 @@
-"""The model pipeline shared between training and label-definition
-comparison (ml/train_conversion_model.py, ml/compare_label_definitions.py).
-Kept separate from both so there's exactly one place that defines what the
-model actually is."""
+"""The model pipeline shared between every leads/followups-based ML module
+(ml/train_conversion_model.py, ml/compare_label_definitions.py,
+ml/train_followup_timing_model.py). Kept separate from all of them so
+there's exactly one place that defines what the underlying model actually
+is - build_pipeline() takes the feature lists as arguments (defaulting to
+module 13's leads features for backward compatibility) so each module can
+supply its own numeric/categorical columns without duplicating the
+preprocessing + classifier setup."""
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegressionCV
@@ -16,14 +20,17 @@ from ml.features import CATEGORICAL_FEATURES, NUMERIC_FEATURES
 RANDOM_STATE = 42
 
 
-def build_pipeline() -> Pipeline:
+def build_pipeline(numeric_features: list[str] | None = None,
+                    categorical_features: list[str] | None = None) -> Pipeline:
+    numeric_features = NUMERIC_FEATURES if numeric_features is None else numeric_features
+    categorical_features = CATEGORICAL_FEATURES if categorical_features is None else categorical_features
     numeric_transformer = Pipeline(steps=[
         ("impute", SimpleImputer(strategy="median")),
         ("scale", StandardScaler()),
     ])
     preprocessor = ColumnTransformer(transformers=[
-        ("numeric", numeric_transformer, NUMERIC_FEATURES),
-        ("categorical", OneHotEncoder(handle_unknown="ignore"), CATEGORICAL_FEATURES),
+        ("numeric", numeric_transformer, numeric_features),
+        ("categorical", OneHotEncoder(handle_unknown="ignore"), categorical_features),
     ])
     # LogisticRegressionCV instead of a fixed-strength LogisticRegression:
     # regenerating the fake-lead data for modules 14/16/17 (Sept 2026) added
