@@ -18,6 +18,7 @@ from app.routers import (
     hostel_allotments,
     leads,
     lookup_values,
+    ml_conversion,
     scholarships,
     settings as settings_router,
     telecallers,
@@ -44,6 +45,7 @@ openapi_tags = [
     {"name": "Settings", "description": "Key/value application configuration, grouped by category."},
     {"name": "Counseling Sessions", "description": "Logged counseling sessions between a counselor and an applicant."},
     {"name": "Users", "description": "Staff directory (active users) for pickers such as a counseling session's counselor, plus admin-only user creation. Email and phone are never exposed."},
+    {"name": "ML - Conversion Prediction", "description": "Predicts a lead's probability of eventually enrolling (roadmap module 13). Read-only; the model is trained offline via ml/train_conversion_model.py, not from live requests."},
 ]
 
 # Interactive docs (/docs, /redoc) and the schema (/openapi.json) list every
@@ -97,6 +99,7 @@ app.include_router(followups.router)
 app.include_router(settings_router.router)
 app.include_router(counseling_sessions.router)
 app.include_router(users.router)
+app.include_router(ml_conversion.router)
 
 
 @app.get("/health")

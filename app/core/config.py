@@ -61,6 +61,11 @@ class Settings(BaseSettings):
     SETTINGS_TABLE: str = "settings"
     USERS_TABLE: str = "users"
 
+    # Path to the trained conversion-predictor artifact (module 13), relative
+    # to the repo root. Never hardcoded in the service - set here, same pattern
+    # as every *_TABLE setting above.
+    CONVERSION_MODEL_PATH: str = "ml/artifacts/conversion_model.joblib"
+
     @property
     def SUPABASE_URL(self) -> str:
         return self.PROD_SUPABASE_URL if self.ENVIRONMENT == "production" else self.DEV_SUPABASE_URL
