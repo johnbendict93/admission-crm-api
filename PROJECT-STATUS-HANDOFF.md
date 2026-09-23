@@ -76,7 +76,7 @@ real integration tests against dev Supabase, no mocking. Run with
 **scikit-learn is pinned to `1.9.1`** in `requirements.txt` — see the
 gotcha about version-skew breaking saved models in the ML-UI handoff doc.
 
-## Frontend status: CRUD complete, ML UI in progress
+## Frontend status: CRUD complete, ML UI complete (all 10)
 
 Next.js 16 (App Router) + Tailwind v4 + shadcn/ui (manually vendored,
 not installed via CLI — see `src/components/ui/`) + TanStack Query v5 +
@@ -87,13 +87,23 @@ backend's live OpenAPI schema — **never hand-edit anything under
 All 16 CRUD modules have working pages (list/create/edit/delete,
 role-gated: any role reads, non-viewer writes, admin/staff deletes).
 
-**ML UI: 4 of 10 done.** See `docs/ml-ui-handoff.md` in this repo for
-the exact remaining work, hook names, response shapes, and gotchas
-already hit. Short version: Leads page has an "AI Insights" dialog
-covering conversion/fraud/best-time/best-telecaller. Applications,
-Followups, Fee Due Schedule, Telecallers, and Dashboard still need their
-ML features wired in (dropout risk, call sentiment, fee default risk,
-ranked leads, source ROI, demand forecast respectively).
+**ML UI: 10 of 10 done** (finished 2026-09-23, all live-verified in the
+browser). Leads: "AI Insights" (conversion, fraud, best time, best
+telecaller). Applications: dropout risk. Followups: call sentiment. Fee
+Due Schedule: fee default risk. Telecallers: "Ranked leads". Dashboard:
+next-3-months enquiry forecast + lead source performance table. Details,
+commit hashes and gotchas in `docs/ml-ui-handoff.md` (frontend repo).
+
+**Model quality, honestly:** all trained on synthetic data and mostly
+weak (ROC-AUC ~0.6 for conversion/dropout/fee default; demand forecast
+MAE ~ the size of the forecasts). Fine for a demo labelled "trained on
+sample data", not something to make promises on.
+
+**Retrain rule:** always run `python ml/train_*.py` in John's own
+`admission-crm-api` conda env on Windows. A retrain done elsewhere
+(`491f464`) produced a pickle that still failed with the `_fill_dtype`
+version-skew error; `7212aae` (conversion) and `f1d304c` (dropout) are
+the real fixes.
 
 ## How to regenerate the typed client (only when the backend schema changes)
 
@@ -178,7 +188,10 @@ that file): `ENVIRONMENT`, `DEV_SUPABASE_URL`/`DEV_SUPABASE_KEY`/
 
 ## Immediate next step
 
-Continue the ML UI integration per `docs/ml-ui-handoff.md` in the
-frontend repo — next up is the **Applications page** (dropout risk,
-module 16). Update that doc's "What's done so far" section with each
-new commit as you go, so the next handoff (if needed) stays accurate.
+ML UI is done. Candidate next steps (John to choose):
+1. **Deploy backend to Render** ("Deploy latest commit") — prod still has
+   the old broken conversion/dropout `.joblib` files until redeployed.
+2. **Fix the lead-name lookup bug** — Followups (and possibly other
+   pages) show raw lead UUIDs because pickers only fetch the first 200
+   leads while dev has ~534.
+3. **Deploy the frontend to Vercel** (not done yet).
