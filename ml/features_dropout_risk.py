@@ -14,16 +14,36 @@ learning anything about dropout risk. submitted_at/reviewed_at are
 similarly outcome-adjacent (how far the paperwork got, not who the
 applicant is) and are left out for the same reason.
 
+FEATURE LIST (revised Sept 2026, first live retrain): started at 9
+features (4 numeric + 5 categorical: category/lead_source/programme/
+department added). Live dev data (178 applications - a genuinely small
+table right now) gave 5-fold CV ROC-AUC 0.540 with std 0.149 - swinging
+from 0.37 to 0.71 fold to fold, not a trustworthy number. Checked each
+feature's actual contribution on the same data: merit_rank is a pure
+rank-transform of cutoff_marks in this seed generator (identical AUC
+whether either one is used alone - see scripts/seed_dev_fake_leads.py's
+merit_rank assignment), so keeping both just duplicates one signal across
+two columns; category/programme/department carry no real signal by
+construction (the seed generator picks them independently of the
+admitted/dropout outcome); lead_source measurably hurt (0.588 vs 0.629
+without it) once combined with the numeric features, most likely because
+its ~9 categories are too sparse on ~140 training rows per fold to
+estimate reliably rather than genuinely uninformative. Trimming to the
+4 features below recovered mean ROC-AUC to 0.657 with std 0.058 - both
+better AND far more stable, on the exact same 178 rows. Worth
+re-evaluating once there are enough applications for the dropped
+features (lead_source especially) to be estimated reliably again.
+
 Needs a JOIN to applicants (applications itself has no cutoff_marks/
-twelfth_percentage/parent_occupation/lead_source - those live on the
-applicant's profile, confirmed live via app/models/applicants.py). See
+twelfth_percentage/parent_occupation - those live on the applicant's
+profile, confirmed live via app/models/applicants.py). See
 ml/train_dropout_risk_model.py's load_dev_applications() for the query."""
 from typing import Optional
 
 import pandas as pd
 
-NUMERIC_FEATURES = ["cutoff_marks", "twelfth_percentage", "pcm_marks", "merit_rank"]
-CATEGORICAL_FEATURES = ["category", "parent_occupation", "lead_source", "programme", "department"]
+NUMERIC_FEATURES = ["cutoff_marks", "twelfth_percentage", "pcm_marks"]
+CATEGORICAL_FEATURES = ["parent_occupation"]
 FEATURE_COLUMNS = NUMERIC_FEATURES + CATEGORICAL_FEATURES
 
 POSITIVE_STAGE = "Admitted"  # completed the funnel - NOT a dropout

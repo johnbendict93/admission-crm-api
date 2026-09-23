@@ -38,23 +38,19 @@ def get_dropout_risk_model():
 
 def predict_dropout_risk(application: dict, applicant: dict) -> tuple[float, str]:
     """application: a raw application dict (applications_service.
-    get_application_by_id). applicant: the linked applicant dict
-    (applicants_service.get_applicant_by_id(application['applicant_id'])).
-    rows_to_frame (ml/features_dropout_risk.py) picks out exactly the
-    columns the model was trained on - deliberately excludes
-    allotted_seat_type/submitted_at/reviewed_at even though they're on the
-    application dict, see that module's docstring for why."""
+    get_application_by_id) - kept as a parameter for the endpoint to pass
+    application_stage/id through for the response, even though the
+    trimmed feature set (see ml/features_dropout_risk.py's docstring for
+    why merit_rank/category/programme/department/lead_source were cut)
+    no longer reads anything off it. applicant: the linked applicant dict
+    (applicants_service.get_applicant_by_id(application['applicant_id']));
+    rows_to_frame picks out exactly the columns the model was trained on."""
     model = get_dropout_risk_model()
     row = {
-        "merit_rank": application.get("merit_rank"),
-        "category": application.get("category"),
-        "programme": application.get("programme"),
-        "department": application.get("department"),
         "cutoff_marks": applicant.get("cutoff_marks"),
         "twelfth_percentage": applicant.get("twelfth_percentage"),
         "pcm_marks": applicant.get("pcm_marks"),
         "parent_occupation": applicant.get("parent_occupation"),
-        "lead_source": applicant.get("lead_source"),
     }
     frame = rows_to_frame([row])
     probability = float(model.predict_proba(frame)[0, 1])

@@ -38,13 +38,14 @@ CV_SCORING = ["roc_auc", "accuracy", "precision", "recall", "f1"]
 # applications or applicants (neither currently used by this seed data,
 # but a real column on both tables) must not leak into training.
 TRAINING_QUERY = """
-    SELECT a.application_stage, a.merit_rank, a.category, a.programme, a.department,
-           p.cutoff_marks, p.twelfth_percentage, p.pcm_marks, p.parent_occupation, p.lead_source
+    SELECT a.application_stage,
+           p.cutoff_marks, p.twelfth_percentage, p.pcm_marks, p.parent_occupation
     FROM public.applications a
     JOIN public.applicants p ON a.applicant_id = p.id
     WHERE a.deleted_at IS NULL AND p.deleted_at IS NULL
     ORDER BY a.id;
-"""
+"""  # merit_rank/category/programme/department/lead_source dropped - see
+# ml/features_dropout_risk.py's docstring for why each one was cut.
 
 
 def load_dev_applications() -> list[dict]:
