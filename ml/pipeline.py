@@ -21,7 +21,8 @@ RANDOM_STATE = 42
 
 
 def build_pipeline(numeric_features: list[str] | None = None,
-                    categorical_features: list[str] | None = None) -> Pipeline:
+                    categorical_features: list[str] | None = None,
+                    cv_scoring: str = "roc_auc") -> Pipeline:
     numeric_features = NUMERIC_FEATURES if numeric_features is None else numeric_features
     categorical_features = CATEGORICAL_FEATURES if categorical_features is None else categorical_features
     numeric_transformer = Pipeline(steps=[
@@ -44,6 +45,23 @@ def build_pipeline(numeric_features: list[str] | None = None,
     # ROC-AUC to ~0.59-0.61 on local reruns of the new data - comparable to
     # the original model, not the artificially inflated number a hand-tuned
     # C could give.
+    #
+    # cv_scoring (default "roc_auc", unchanged for modules 13/14/16/17):
+    # found while building module 18 that ROC-AUC is scale-invariant - for
+    # a model with a SINGLE categorical feature (no numeric features at
+    # all, module 18's case), every candidate C in the grid produces
+    # IDENTICAL internal CV ROC-AUC (the ranking of one-hot categories
+    # doesn't change under any positive rescaling of the coefficients), so
+    # LogisticRegressionCV degenerately picks the smallest/strongest C on
+    # the grid - true ranking ability (a real, non-degenerate outer-loop
+    # ROC-AUC) survives, but predict_proba collapses every prediction to
+    # ~0.5, which is useless for an endpoint whose whole point is a
+    # calibrated risk score. "neg_log_loss" (module 18 passes this
+    # explicitly) DOES depend on how spread out the probabilities are, so
+    # it breaks that degeneracy and picks a C that actually differentiates
+    # categories. Modules with at least one numeric feature never hit this
+    # (numeric features already vary continuously, so C-scale is never
+    # degenerate for them) - confirmed by leaving their default unchanged.
     classifier = LogisticRegressionCV(class_weight="balanced", max_iter=2000, random_state=RANDOM_STATE,
-                                       cv=5, Cs=15, scoring="roc_auc")
+                                       cv=5, Cs=15, scoring=cv_scoring)
     return Pipeline(steps=[("preprocess", preprocessor), ("classify", classifier)])
