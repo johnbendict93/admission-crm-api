@@ -214,3 +214,12 @@ write in each area you use (call_schedules matters most: offset-aware datetime f
 summary reads "AI Error: ..." because the Groq key is a dummy - that is expected.
 supabase-py must be >= 2.17 for `sb_secret_` / `sb_publishable_` keys (2.15 rejects them);
 prod's legacy service_role JWT works on any version.
+
+### Migrations 0019 + 0020: applied to PROD 2026-09-23
+
+Both were dev-only until now (fee_due_schedule, enquiry_monthly_history -
+brand-new empty tables, nothing existing references them). Found when a
+read-only prod inventory returned APIError for both tables. Applied with
+`python migrations/run_migrations.py apply --env prod` (confirmation phrase
+typed by John): "Applied 2 migration(s) to prod." Rollbacks:
+`migrations/rollback/0019_rollback_prod.sql`, `0020_rollback_prod.sql`.

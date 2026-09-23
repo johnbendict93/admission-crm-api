@@ -196,9 +196,19 @@ Everything is deployed (2026-09-23):
 - **Backend live on Render** with the fixed models.
 
 Open items / caveats:
-- PROD already contains some rows (5 leads, 15 applications, a followup by
-  "kumar") — confirm they're fake before demoing; project rule is no real
-  student data.
+- PROD sample-data cleanup (2026-09-23, John confirmed all were test rows
+  typed by hand): 55 rows hard-deleted (5 leads, 20 applicants, 15
+  applications, 1 followup, 1 call_schedule, 13 legacy `follow_ups`) via the
+  gitignored `check_prod_cleanup.py`; JSON backup on John's laptop in
+  `_local_backups/`. Config tables (users, settings, lookup_values,
+  document_types) kept. PROD is now empty of records. DEV untouched (534
+  synthetic leads etc.).
+- Migrations 0019 (fee_due_schedule) + 0020 (enquiry_monthly_history)
+  applied to PROD 2026-09-23 — they were dev-only before, so the Fee Due
+  Schedule page 500'd on the live site.
+- Demo plan (not started): second Render service on the DEV database
+  (ENVIRONMENT=development, DOCS_ENABLED=false, PROD_* set to dummy values)
+  so the public demo shows synthetic data; `DOCS_ENABLED` code is in `8f2311b`.
 - ML models are trained on DEV synthetic data, so predictions on the prod
   site (esp. the demand forecast) reflect sample data, not prod.
 - Render free tier sleeps: first request after idle can take ~50s.
