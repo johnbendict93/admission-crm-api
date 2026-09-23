@@ -102,7 +102,16 @@ sample data", not something to make promises on.
 `admission-crm-api` conda env on Windows. A retrain done elsewhere
 (`491f464`) produced a pickle that still failed with the `_fill_dtype`
 version-skew error; `7212aae` (conversion) and `f1d304c` (dropout) are
-the real fixes.
+the real fixes. `2d05495` retrained the other 5 (followup timing,
+fraud, call sentiment, demand forecast, fee default) — all 7 artifacts
+were confirmed matching scikit-learn 1.9.1 on 2026-09-23.
+
+**Quick health check for models:** `python check_model_versions.py`
+(gitignored local script in the repo root; loads every `ml/artifacts/*.joblib`
+and prints OK / RETRAIN / BROKEN). If it's missing in a fresh clone, it's
+~25 lines: `joblib.load` each artifact inside
+`warnings.catch_warnings(record=True)` and flag any
+`InconsistentVersionWarning`. Run it after any scikit-learn upgrade.
 
 ## How to regenerate the typed client (only when the backend schema changes)
 
