@@ -38,6 +38,16 @@ def make_label(status: Optional[str]) -> int:
 NEGATIVE_STATUS = "Lost"
 RESOLVED_STATUSES = {POSITIVE_STATUS, NEGATIVE_STATUS}
 
+# Module 21 (Lead Ranking System) needs the complement: leads still being
+# worked, with no outcome yet - exactly the ones a telecaller needs ranked.
+# Matches the generator's actual status vocabulary (scripts/
+# seed_dev_fake_leads.py: status is "Enrolled"/"Lost" once resolved, else
+# one of these three) - hardcoded rather than "every status that isn't
+# RESOLVED_STATUSES" because the DB has no CHECK constraint on leads.status,
+# so an unexpected value should be excluded from ranking, not silently
+# included as if it were open.
+OPEN_STATUSES = {"New", "Contacted", "Visited"}
+
 
 def filter_resolved(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [r for r in rows if r.get("status") in RESOLVED_STATUSES]

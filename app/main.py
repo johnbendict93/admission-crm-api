@@ -23,6 +23,7 @@ from app.routers import (
     ml_dropout_risk,
     ml_fee_default_risk,
     ml_followup_timing,
+    ml_lead_ranking,
     ml_source_roi,
     ml_telecaller_match,
     scholarships,
@@ -42,6 +43,7 @@ openapi_tags = [
     {"name": "Fee Payments", "description": "Payments recorded against an applicant's fees."},
     {"name": "Fee Due Schedule", "description": "What an applicant owes, and by when - separate from Fee Payments (what has actually been paid). Feeds roadmap module 18 (Fee Default Risk)."},
     {"name": "ML - Fee Default Risk", "description": "Predicts the probability that a fee_due_schedule row will go unpaid past its due date (roadmap module 18). Read-only; the model is trained offline via ml/train_fee_default_risk_model.py, not from live requests."},
+    {"name": "ML - Lead Ranking", "description": "Ranks a telecaller's open leads by predicted conversion probability, best-first (roadmap module 21). Reuses module 13's trained conversion model rather than a separate one."},
     {"name": "Scholarships", "description": "Scholarship applications and awards tied to an applicant."},
     {"name": "Hostel Allotments", "description": "Hostel room assignments tied to an applicant."},
     {"name": "Telecallers", "description": "Staff who place outbound calls to leads."},
@@ -117,6 +119,7 @@ app.include_router(ml_source_roi.router)
 app.include_router(ml_followup_timing.router)
 app.include_router(ml_dropout_risk.router)
 app.include_router(ml_fee_default_risk.router)
+app.include_router(ml_lead_ranking.router)
 app.include_router(ml_telecaller_match.router)
 
 
