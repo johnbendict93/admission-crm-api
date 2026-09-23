@@ -123,12 +123,58 @@ RESPONSE_POS = ["Interested, will visit campus", "Interested, discussing with pa
                 "Positive, asked about fee structure", "Wants brochure / prospectus sent"]
 RESPONSE_NEU = ["Will call back later", "Asked to call after exams", "No response / voicemail", "Busy, call later"]
 RESPONSE_NEG = ["Not interested", "Already joined elsewhere", "Wrong number", "Switched off"]
-NOTES_POS = ["Spoke with student, sounded genuinely interested.", "Parent joined the call, positive about fees.",
-             "Asked several questions about placements and hostel."]
-NOTES_NEU = ["Could not get much information, will try again.", "Requested a callback after board exams.",
-             "Phone rang but no pickup, left a message."]
-NOTES_NEG = ["Student said they've decided on another college.", "Number appears to be inactive.",
-             "Clearly not interested, asked to be removed from the list."]
+# module 19 (NLP Call Sentiment): NOTES_POS/NEU/NEG used to be 3 fixed
+# strings per bucket, repeated verbatim across ~1600 followups - nowhere
+# near enough lexical variety for a real text classifier to learn from
+# (it would just memorize the 3 exact strings per class). Replaced with a
+# combinatorial bank (opener + detail + optional closer) that produces
+# hundreds of distinct, still-realistic sentences per bucket. RESPONSE_POS/
+# NEU/NEG are UNCHANGED - module 14 keyword-matches exact substrings in
+# `response` (ml/features_followup_timing.py's POSITIVE_KEYWORDS), so that
+# short categorical field is left alone; only the free-text `notes` field
+# (module 19's actual training input) gets the richer bank.
+NOTE_OPENERS = {
+    "pos": ["Spoke with the student and", "Had a good conversation -", "Called and", "Reached the student directly and",
+            "Parent picked up and", "Student answered and", "Got through on the second attempt and", "Quick call -"],
+    "neu": ["Tried calling -", "Called but", "Reached out -", "Attempted contact -", "Rang the number -", "Follow-up call -"],
+    "neg": ["Spoke with the student -", "Reached the parent -", "Called and", "Got through -", "Direct answer -"],
+}
+NOTE_DETAILS = {
+    "pos": ["sounded genuinely excited about the programme.", "asked detailed questions about the curriculum.",
+            "the family was keen to know about hostel facilities.", "seemed reassured after hearing about the placement record.",
+            "wants to visit the campus this weekend.", "mentioned this college is now their first choice.",
+            "the parent asked about the fee payment schedule, which is usually a good sign.",
+            "compared us favourably to another college they visited."],
+    "neu": ["no one picked up, left a voicemail.", "the line was busy, will try again tomorrow.",
+            "the student was in class and asked to call back later.", "the family said the student is busy with exam prep right now.",
+            "got a short reply asking to call after the exams are over.", "the phone rang out with no answer.",
+            "spoke briefly but they didn't have time to talk.", "the call disconnected midway, will retry."],
+    "neg": ["they've already confirmed admission at another college.", "clearly not interested in pursuing this any further.",
+            "the number seems to be switched off / inactive.", "was told this is the wrong number for that student.",
+            "the family decided against engineering this year.", "asked to be removed from the calling list.",
+            "said the fees don't fit their budget.", "no response after several attempts, marking as unresponsive."],
+}
+NOTE_CLOSERS = {
+    "pos": ["Will follow up after the campus visit.", "Sending the brochure right away.",
+            "Planning a callback in a few days to confirm.", ""],
+    "neu": ["Will try again in a couple of days.", "Noted the reason and rescheduled.", ""],
+    "neg": ["Will not follow up further.", "Marking this as a lost lead.", ""],
+}
+
+
+def build_note(rng, bucket):
+    """Combines an opener + detail + optional closer into one realistic
+    call-note sentence. ~8 openers x 8 details x 4 closers per bucket
+    (pos/neu) gives ~250+ distinct combinations - enough for module 19's
+    text classifier to learn real lexical patterns instead of memorizing a
+    handful of fixed strings."""
+    opener = rng.choice(NOTE_OPENERS[bucket])
+    detail = rng.choice(NOTE_DETAILS[bucket])
+    closer = rng.choice(NOTE_CLOSERS[bucket])
+    note = f"{opener} {detail}"
+    if closer:
+        note = f"{note} {closer}"
+    return note
 
 # --- Scheduled calls (module 14 groundwork) ---
 CALL_SCHEDULE_STATUS = [("Pending", 70), ("Completed", 15), ("Missed", 15)]
@@ -390,7 +436,7 @@ def build_followups_and_schedules(rng, lead_rows, now=None):
             bucket = rng.choices(["pos", "neu", "neg"],
                                   weights=[max(1.0, pos_w), neu_w, max(1.0, neg_w)], k=1)[0]
             response = rng.choice({"pos": RESPONSE_POS, "neu": RESPONSE_NEU, "neg": RESPONSE_NEG}[bucket])
-            notes = rng.choice({"pos": NOTES_POS, "neu": NOTES_NEU, "neg": NOTES_NEG}[bucket])
+            notes = build_note(rng, bucket)
             next_fu = None
             if status in ("Contacted", "Visited") or not is_last:
                 next_fu = (call_dt + timedelta(days=rng.randint(3, 14))).date().isoformat()

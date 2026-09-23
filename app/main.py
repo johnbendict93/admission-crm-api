@@ -19,6 +19,7 @@ from app.routers import (
     hostel_allotments,
     leads,
     lookup_values,
+    ml_call_sentiment,
     ml_conversion,
     ml_dropout_risk,
     ml_fee_default_risk,
@@ -55,6 +56,7 @@ openapi_tags = [
     {"name": "Settings", "description": "Key/value application configuration, grouped by category."},
     {"name": "Counseling Sessions", "description": "Logged counseling sessions between a counselor and an applicant."},
     {"name": "Users", "description": "Staff directory (active users) for pickers such as a counseling session's counselor, plus admin-only user creation. Email and phone are never exposed."},
+    {"name": "ML - Call Sentiment", "description": "Predicts the sentiment (positive/neutral/negative) of a followup's free-text notes (roadmap module 19). Read-only; the model is trained offline via ml/train_call_sentiment_model.py, not from live requests."},
     {"name": "ML - Conversion Prediction", "description": "Predicts a lead's probability of eventually enrolling (roadmap module 13). Read-only; the model is trained offline via ml/train_conversion_model.py, not from live requests."},
     {"name": "ML - Source ROI", "description": "Conversion performance by lead source (roadmap module 15). Computed live from the leads table on every request - not a trained model."},
     {"name": "ML - Follow-up Timing", "description": "Ranks candidate calling hours for a lead's assigned telecaller by predicted response quality (roadmap module 14). Read-only; the model is trained offline via ml/train_followup_timing_model.py, not from live requests."},
@@ -114,6 +116,7 @@ app.include_router(followups.router)
 app.include_router(settings_router.router)
 app.include_router(counseling_sessions.router)
 app.include_router(users.router)
+app.include_router(ml_call_sentiment.router)
 app.include_router(ml_conversion.router)
 app.include_router(ml_source_roi.router)
 app.include_router(ml_followup_timing.router)

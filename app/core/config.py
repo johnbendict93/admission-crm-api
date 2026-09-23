@@ -74,6 +74,8 @@ class Settings(BaseSettings):
     DROPOUT_RISK_MODEL_PATH: str = "ml/artifacts/dropout_risk_model.joblib"
     # convention as CONVERSION_MODEL_PATH / FOLLOWUP_TIMING_MODEL_PATH / DROPOUT_RISK_MODEL_PATH above.
     FEE_DEFAULT_RISK_MODEL_PATH: str = "ml/artifacts/fee_default_risk_model.joblib"
+    # convention as CONVERSION_MODEL_PATH / FOLLOWUP_TIMING_MODEL_PATH / DROPOUT_RISK_MODEL_PATH / FEE_DEFAULT_RISK_MODEL_PATH above.
+    CALL_SENTIMENT_MODEL_PATH: str = "ml/artifacts/call_sentiment_model.joblib"
 
     @property
     def SUPABASE_URL(self) -> str:
