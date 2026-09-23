@@ -1,0 +1,46 @@
+{
+  "n_rows": 1583,
+  "n_skipped": 5,
+  "cv_folds": 5,
+  "label_counts": {
+    "neutral": 501,
+    "negative": 530,
+    "positive": 552
+  },
+  "cv_accuracy_mean": 1.0,
+  "cv_accuracy_std": 0.0,
+  "cv_accuracy_folds": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+  ],
+  "cv_f1_macro_mean": 1.0,
+  "cv_f1_macro_std": 0.0,
+  "cv_f1_macro_folds": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+  ],
+  "cv_precision_macro_mean": 1.0,
+  "cv_precision_macro_std": 0.0,
+  "cv_precision_macro_folds": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+  ],
+  "cv_recall_macro_mean": 1.0,
+  "cv_recall_macro_std": 0.0,
+  "cv_recall_macro_folds": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+  ]
+}
