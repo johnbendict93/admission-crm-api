@@ -23,3 +23,6 @@ check_*.py
 # Module 22 fraud ground truth - live DEV row ids, meaningless once
 # leads get regenerated. See scripts/seed_dev_fraud_leads.py.
 ml/eval/
+
+# Local-only backups of prod rows before cleanups (may contain data)
+_local_backups/

@@ -72,8 +72,13 @@ openapi_tags = [
 
 # Interactive docs (/docs, /redoc) and the schema (/openapi.json) list every
 # endpoint, so they are switched off in production and stay on in development.
-# Driven by ENVIRONMENT (set on Render); no hardcoded URLs or flags.
-_docs_enabled = settings.ENVIRONMENT != "production"
+# Driven by ENVIRONMENT (set on Render), unless DOCS_ENABLED overrides it
+# (e.g. the public demo deployment: ENVIRONMENT=development, DOCS_ENABLED=false).
+_docs_enabled = (
+    settings.DOCS_ENABLED
+    if settings.DOCS_ENABLED is not None
+    else settings.ENVIRONMENT != "production"
+)
 
 app = FastAPI(
     title="Admission CRM API",

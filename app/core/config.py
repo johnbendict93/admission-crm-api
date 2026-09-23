@@ -43,6 +43,12 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str = ""
     COLLEGE_SHORT: str = "DCE"
 
+    # Explicit override for /docs, /redoc, /openapi.json. Unset (default) =
+    # on in development, off in production. Set DOCS_ENABLED=false on a
+    # public demo deployment that runs ENVIRONMENT=development (dev DB,
+    # synthetic data) but is reachable from the internet.
+    DOCS_ENABLED: bool | None = None
+
     # Comma-separated list; e.g. "http://localhost:3000,https://your-app.vercel.app"
     ALLOWED_ORIGINS: str = "http://localhost:3000"
     LEADS_TABLE: str = "leads"
