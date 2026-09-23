@@ -13,6 +13,7 @@ from app.routers import (
     campus_visits,
     counseling_sessions,
     document_types,
+    enquiry_monthly_history,
     fee_due_schedule,
     fee_payments,
     followups,
@@ -43,6 +44,7 @@ openapi_tags = [
     {"name": "Applications", "description": "A specific programme application tied to an applicant, including seat allotment and review status."},
     {"name": "Fee Payments", "description": "Payments recorded against an applicant's fees."},
     {"name": "Fee Due Schedule", "description": "What an applicant owes, and by when - separate from Fee Payments (what has actually been paid). Feeds roadmap module 18 (Fee Default Risk)."},
+    {"name": "Enquiry Monthly History", "description": "Monthly enquiry (lead) counts used as historical training data for demand forecasting (roadmap module 20). Seeded rows are illustrative synthetic history (source=synthetic); combined with live current-year counts derived from leads.created_at for training."},
     {"name": "ML - Fee Default Risk", "description": "Predicts the probability that a fee_due_schedule row will go unpaid past its due date (roadmap module 18). Read-only; the model is trained offline via ml/train_fee_default_risk_model.py, not from live requests."},
     {"name": "ML - Lead Ranking", "description": "Ranks a telecaller's open leads by predicted conversion probability, best-first (roadmap module 21). Reuses module 13's trained conversion model rather than a separate one."},
     {"name": "Scholarships", "description": "Scholarship applications and awards tied to an applicant."},
@@ -105,6 +107,7 @@ app.include_router(applicants.router)
 app.include_router(applications.router)
 app.include_router(fee_payments.router)
 app.include_router(fee_due_schedule.router)
+app.include_router(enquiry_monthly_history.router)
 app.include_router(scholarships.router)
 app.include_router(hostel_allotments.router)
 app.include_router(telecallers.router)
