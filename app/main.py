@@ -22,6 +22,7 @@ from app.routers import (
     ml_dropout_risk,
     ml_followup_timing,
     ml_source_roi,
+    ml_telecaller_match,
     scholarships,
     settings as settings_router,
     telecallers,
@@ -52,6 +53,7 @@ openapi_tags = [
     {"name": "ML - Source ROI", "description": "Conversion performance by lead source (roadmap module 15). Computed live from the leads table on every request - not a trained model."},
     {"name": "ML - Follow-up Timing", "description": "Ranks candidate calling hours for a lead's assigned telecaller by predicted response quality (roadmap module 14). Read-only; the model is trained offline via ml/train_followup_timing_model.py, not from live requests."},
     {"name": "ML - Dropout Risk", "description": "Predicts the probability that an in-progress application will not end in Admitted (roadmap module 16). Read-only; the model is trained offline via ml/train_dropout_risk_model.py, not from live requests."},
+    {"name": "ML - Telecaller Matching", "description": "Ranks active telecallers by a lead's predicted conversion probability if assigned to each one (roadmap module 17). Reuses module 13's trained model rather than a separate one."},
 ]
 
 # Interactive docs (/docs, /redoc) and the schema (/openapi.json) list every
@@ -109,6 +111,7 @@ app.include_router(ml_conversion.router)
 app.include_router(ml_source_roi.router)
 app.include_router(ml_followup_timing.router)
 app.include_router(ml_dropout_risk.router)
+app.include_router(ml_telecaller_match.router)
 
 
 @app.get("/health")
