@@ -1,0 +1,25 @@
+{
+  "n_rows": 45,
+  "n_synthetic_rows": 36,
+  "n_real_rows": 13,
+  "cv_folds": 5,
+  "date_range": "2023-01 to 2026-09",
+  "cv_mean_absolute_error_mean": 12.650414136311179,
+  "cv_mean_absolute_error_std": 3.4899049809230456,
+  "cv_mean_absolute_error_folds": [
+    9.38888378258091,
+    8.838331202043452,
+    14.876837432739055,
+    11.989933806228473,
+    18.158084457964005
+  ],
+  "cv_mean_absolute_percentage_error_mean": 0.5099952718414479,
+  "cv_mean_absolute_percentage_error_std": 0.28747646334905375,
+  "cv_mean_absolute_percentage_error_folds": [
+    0.6004830140343607,
+    0.282991990523905,
+    0.285757421410429,
+    1.0354378632813648,
+    0.34530606995717983
+  ]
+}
