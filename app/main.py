@@ -26,6 +26,7 @@ from app.routers import (
     ml_dropout_risk,
     ml_fee_default_risk,
     ml_followup_timing,
+    ml_fraud_detection,
     ml_lead_ranking,
     ml_source_roi,
     ml_telecaller_match,
@@ -47,6 +48,7 @@ openapi_tags = [
     {"name": "Fee Due Schedule", "description": "What an applicant owes, and by when - separate from Fee Payments (what has actually been paid). Feeds roadmap module 18 (Fee Default Risk)."},
     {"name": "Enquiry Monthly History", "description": "Monthly enquiry (lead) counts used as historical training data for demand forecasting (roadmap module 20). Seeded rows are illustrative synthetic history (source=synthetic); combined with live current-year counts derived from leads.created_at for training."},
     {"name": "ML - Demand Forecast", "description": "Predicts the number of enquiries (leads) expected in a given calendar month (roadmap module 20). Read-only; combines seeded synthetic history with real monthly counts derived from leads.created_at; trained offline via ml/train_demand_forecast_model.py, not from live requests."},
+    {"name": "ML - Fraud Detection", "description": "Scores how anomalous a lead looks compared to the rest of the leads table (roadmap module 22). Unsupervised - no confirmed-fraud label exists anywhere in this schema by design; trained offline via ml/train_fraud_detection_model.py, not from live requests."},
     {"name": "ML - Fee Default Risk", "description": "Predicts the probability that a fee_due_schedule row will go unpaid past its due date (roadmap module 18). Read-only; the model is trained offline via ml/train_fee_default_risk_model.py, not from live requests."},
     {"name": "ML - Lead Ranking", "description": "Ranks a telecaller's open leads by predicted conversion probability, best-first (roadmap module 21). Reuses module 13's trained conversion model rather than a separate one."},
     {"name": "Scholarships", "description": "Scholarship applications and awards tied to an applicant."},
@@ -111,6 +113,7 @@ app.include_router(fee_payments.router)
 app.include_router(fee_due_schedule.router)
 app.include_router(enquiry_monthly_history.router)
 app.include_router(ml_demand_forecast.router)
+app.include_router(ml_fraud_detection.router)
 app.include_router(scholarships.router)
 app.include_router(hostel_allotments.router)
 app.include_router(telecallers.router)

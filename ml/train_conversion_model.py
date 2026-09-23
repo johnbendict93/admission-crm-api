@@ -48,12 +48,22 @@ def load_dev_leads() -> list[dict]:
     different physical order between runs even when nothing changed, which
     would silently change which rows land in which CV fold - making metrics
     non-reproducible run to run for reasons that have nothing to do with the
-    model. Ordering by id fixes that."""
+    model. Ordering by id fixes that.
+
+    WHERE email NOT LIKE 'fraud.%' (added for module 22): this query used
+    to have no filter at all - it trained on every row in the table.
+    scripts/seed_dev_fraud_leads.py plants deliberately-weird leads
+    (duplicate phones, mismatched district/school, implausible marks/score)
+    for module 22's anomaly detector to be evaluated against - without this
+    filter, module 13's conversion model would quietly absorb those rows
+    as ordinary negative examples too. Every planted fraud lead's email
+    starts with "fraud." (see that script's docstring) so this filter
+    reliably excludes exactly those rows and nothing else."""
     conn = psycopg2.connect(settings.DEV_DATABASE_URL)
     conn.set_session(readonly=True, autocommit=True)
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cols = ", ".join(TRAINING_SELECT_COLUMNS)
-    cur.execute(f"SELECT {cols} FROM public.leads ORDER BY id;")
+    cur.execute(f"SELECT {cols} FROM public.leads WHERE email NOT LIKE 'fraud.%' ORDER BY id;")
     rows = [dict(r) for r in cur.fetchall()]
     cur.close()
     conn.close()

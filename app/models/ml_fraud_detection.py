@@ -1,0 +1,15 @@
+from pydantic import BaseModel
+
+
+class FraudScoreResponse(BaseModel):
+    """Output of the module-22 fraud anomaly detector. anomaly_score
+    follows sklearn's IsolationForest.decision_function convention: lower
+    (more negative) = more anomalous, roughly 0 = the fitted normal/
+    anomalous boundary, positive = solidly normal - NOT a 0-1 probability
+    the way the classification modules' scores are. is_anomalous is the
+    same call ml/train_fraud_detection_model.py's evaluation used
+    (predict() == -1), not just a hand-picked threshold on anomaly_score."""
+    lead_id: str
+    anomaly_score: float
+    is_anomalous: bool
+    model_version: str
