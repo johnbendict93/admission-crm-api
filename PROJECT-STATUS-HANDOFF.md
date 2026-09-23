@@ -31,8 +31,9 @@ handoff is about the newer, hardened FastAPI + Next.js rebuild.**
 | Frontend (Next.js) | `C:\Users\johnb\Downloads\Admission-CRM-Frontend` | github.com/johnbendict93/Admission-CRM-Frontend (private) |
 
 Backend is deployed live on Render (free tier, Singapore):
-`https://admission-crm-api.onrender.com` — manual "Deploy latest commit"
-in the Render dashboard, no auto-deploy. `/docs`, `/redoc`, `/openapi.json`
+`https://admission-crm-api.onrender.com` — **Auto-Deploy is ON**: every
+`git push` to `main` triggers a Render deploy (normally ~1.5 min; a deploy
+can sit "In progress" if a newer one supersedes it). `/docs`, `/redoc`, `/openapi.json`
 are deliberately disabled in production (check `/health` instead — a 404
 on `/docs` in prod is expected, not broken). Frontend Vercel deploy status
 is last known as **not yet done** — still local-dev-only as of this
@@ -189,9 +190,6 @@ that file): `ENVIRONMENT`, `DEV_SUPABASE_URL`/`DEV_SUPABASE_KEY`/
 ## Immediate next step
 
 ML UI is done. Candidate next steps (John to choose):
-1. **Deploy backend to Render** ("Deploy latest commit") — prod still has
-   the old broken conversion/dropout `.joblib` files until redeployed.
-2. **Fix the lead-name lookup bug** — Followups (and possibly other
-   pages) show raw lead UUIDs because pickers only fetch the first 200
-   leads while dev has ~534.
-3. **Deploy the frontend to Vercel** (not done yet).
+1. **Deploy the frontend to Vercel** (not done yet).
+(Done 2026-09-23: backend redeployed to Render with the fixed models —
+`113987b` live; lead-name UUID bug fixed in the frontend.)
