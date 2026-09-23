@@ -62,8 +62,13 @@ class TestListLeads:
             full_page = client.get(f"/leads/?limit={full_limit}&offset=0")
             assert full_page.status_code == 200
             full_body = full_page.json()
-            assert len(full_body["items"]) == full_body["total"]
-            assert full_body["has_more"] is False
+            # The API caps limit at 200 (Query(..., le=200)), so once dev
+            # has more than 200 rows in this table a single page can never
+            # return every row. len(items) tracks full_limit (== min(total,
+            # 200)), not total itself, and has_more is only False once
+            # total actually fits within one page.
+            assert len(full_body["items"]) == full_limit
+            assert full_body["has_more"] is (full_body["total"] > full_limit)
         finally:
             supabase.table(leads_table).delete().eq("id", id_a).execute()
             supabase.table(leads_table).delete().eq("id", id_b).execute()
