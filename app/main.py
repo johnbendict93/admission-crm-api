@@ -13,6 +13,7 @@ from app.routers import (
     campus_visits,
     counseling_sessions,
     document_types,
+    fee_due_schedule,
     fee_payments,
     followups,
     hostel_allotments,
@@ -38,6 +39,7 @@ openapi_tags = [
     {"name": "Applicants", "description": "Individuals who have started the application process, with full personal and academic profile data."},
     {"name": "Applications", "description": "A specific programme application tied to an applicant, including seat allotment and review status."},
     {"name": "Fee Payments", "description": "Payments recorded against an applicant's fees."},
+    {"name": "Fee Due Schedule", "description": "What an applicant owes, and by when - separate from Fee Payments (what has actually been paid). Feeds roadmap module 18 (Fee Default Risk)."},
     {"name": "Scholarships", "description": "Scholarship applications and awards tied to an applicant."},
     {"name": "Hostel Allotments", "description": "Hostel room assignments tied to an applicant."},
     {"name": "Telecallers", "description": "Staff who place outbound calls to leads."},
@@ -96,6 +98,7 @@ app.include_router(leads.router)
 app.include_router(applicants.router)
 app.include_router(applications.router)
 app.include_router(fee_payments.router)
+app.include_router(fee_due_schedule.router)
 app.include_router(scholarships.router)
 app.include_router(hostel_allotments.router)
 app.include_router(telecallers.router)

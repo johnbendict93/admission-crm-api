@@ -49,6 +49,7 @@ class Settings(BaseSettings):
     APPLICANTS_TABLE: str = "applicants"
     APPLICATIONS_TABLE: str = "applications"
     FEE_PAYMENTS_TABLE: str = "fee_payments"
+    FEE_DUE_SCHEDULE_TABLE: str = "fee_due_schedule"
     SCHOLARSHIPS_TABLE: str = "scholarships"
     HOSTEL_ALLOTMENTS_TABLE: str = "hostel_allotments"
     TELECALLERS_TABLE: str = "telecallers"
