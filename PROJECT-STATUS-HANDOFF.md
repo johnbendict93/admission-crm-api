@@ -35,9 +35,7 @@ Backend is deployed live on Render (free tier, Singapore):
 `git push` to `main` triggers a Render deploy (normally ~1.5 min; a deploy
 can sit "In progress" if a newer one supersedes it). `/docs`, `/redoc`, `/openapi.json`
 are deliberately disabled in production (check `/health` instead — a 404
-on `/docs` in prod is expected, not broken). Frontend Vercel deploy status
-is last known as **not yet done** — still local-dev-only as of this
-writing.
+on `/docs` in prod is expected, not broken). Frontend is live on Vercel (see "Immediate next step").
 
 ## Backend status: fully complete
 
@@ -190,6 +188,17 @@ that file): `ENVIRONMENT`, `DEV_SUPABASE_URL`/`DEV_SUPABASE_KEY`/
 ## Immediate next step
 
 ML UI is done. Candidate next steps (John to choose):
-1. **Deploy the frontend to Vercel** (not done yet).
-(Done 2026-09-23: backend redeployed to Render with the fixed models —
-`113987b` live; lead-name UUID bug fixed in the frontend.)
+Everything is deployed (2026-09-23):
+- **Frontend live on Vercel:** https://admission-crm-frontend-fo7b.vercel.app
+  (Hobby plan, project `admission-crm-frontend-fo7b`, auto-deploys on push
+  to `master`; one env var `BACKEND_API_URL=https://admission-crm-api.onrender.com`).
+  Login + Dashboard verified live against PROD.
+- **Backend live on Render** with the fixed models.
+
+Open items / caveats:
+- PROD already contains some rows (5 leads, 15 applications, a followup by
+  "kumar") — confirm they're fake before demoing; project rule is no real
+  student data.
+- ML models are trained on DEV synthetic data, so predictions on the prod
+  site (esp. the demand forecast) reflect sample data, not prod.
+- Render free tier sleeps: first request after idle can take ~50s.
