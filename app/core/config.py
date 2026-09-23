@@ -68,6 +68,9 @@ class Settings(BaseSettings):
     # Path to the trained follow-up-timing artifact (module 14), same
     # convention as CONVERSION_MODEL_PATH above.
     FOLLOWUP_TIMING_MODEL_PATH: str = "ml/artifacts/followup_timing_model.joblib"
+    # Path to the trained dropout-risk artifact (module 16), same
+    # convention as CONVERSION_MODEL_PATH / FOLLOWUP_TIMING_MODEL_PATH above.
+    DROPOUT_RISK_MODEL_PATH: str = "ml/artifacts/dropout_risk_model.joblib"
 
     @property
     def SUPABASE_URL(self) -> str:
