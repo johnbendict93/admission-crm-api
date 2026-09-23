@@ -1,0 +1,11 @@
+{
+  "n_rows": 534,
+  "n_flagged": 39,
+  "ground_truth_recall": 1.0,
+  "ground_truth_by_type": {
+    "duplicate-phone": "8/8",
+    "bot-timestamp": "8/8",
+    "geo-mismatch": "6/6",
+    "implausible-marks": "6/6"
+  }
+}
