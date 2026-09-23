@@ -1,0 +1,12 @@
+{
+  "name": "admission-crm-typed-client",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Generated TypeScript types + React Query hooks from the Admission-CRM-API OpenAPI schema (/openapi.json). Consumed by the future Next.js frontend so every page is built against real, type-checked backend contracts instead of hand-typed guesses.",
+  "scripts": {
+    "generate": "orval"
+  },
+  "devDependencies": {
+    "orval": "8.33.0"
+  }
+}
