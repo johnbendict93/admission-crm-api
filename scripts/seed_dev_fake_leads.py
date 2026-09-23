@@ -141,8 +141,6 @@ CALL_SCHEDULE_STATUS = [("Pending", 70), ("Completed", 15), ("Missed", 15)]
 # never click an explicit "withdraw" button, the file just goes cold at
 # whatever stage it was last at. "Withdrawn" covers the minority who do
 # explicitly cancel.
-DROPOUT_STAGES = [("Draft", 30), ("Documents Submitted", 25), ("Fee Pending", 20),
-                   ("Verified", 15), ("Withdrawn", 10)]
 SEAT_TYPES = [("Government", 55), ("Management", 30), ("Spot", 8), ("NRI", 4), ("Lateral Entry", 3)]
 
 
@@ -273,18 +271,34 @@ def generate(count, seed):
 
         # --- applicant + application journey ---
         # Enrolled leads completed it (Admitted). A slice of Lost/Visited
-        # leads - weighted toward decent cut-offs, since stronger students
-        # are more likely to have started an application at all - started
-        # the process and then stalled: that's the dropout population
-        # module 16 needs. Fresh New/Contacted leads never started one.
+        # leads started the process and then stalled - that's the dropout
+        # population module 16 needs. Fresh New/Contacted leads never
+        # started one.
+        #
+        # IMPORTANT (found while building module 16, Sept 2026, two tries):
+        # v1 gated "started an application" on cutoff alone (cutoff >= 120
+        # -> +0.20 start_prob). That pulled the dropout cohort's cutoff
+        # distribution to within 0.1 points of the Admitted cohort's
+        # (150.1 vs 150.1 mean, checked directly) - destroyed the exact
+        # signal module 16 needs. v2 tried gating on `p` (the same overall
+        # conversion propensity used for the Enrolled/Lost draw) instead,
+        # on the theory that stronger prospects engage more - but that has
+        # the identical problem one level up: boosting start_prob for
+        # higher-p Lost/Visited leads pulls THEIR feature distribution
+        # (source/occupation/cutoff, everything that feeds p) back toward
+        # the Enrolled cohort's too, for the same reason. ROC-AUC stayed
+        # at ~0.55 both times.
+        #
+        # v3 (this one): do NOT select on any feature at all. A flat,
+        # unconditional probability makes the dropout cohort a genuinely
+        # representative random sample of everyone who did NOT enroll -
+        # which is naturally, honestly different from the Enrolled
+        # cohort's feature distribution, because Enrolled was already the
+        # subset that cleared the p bar. No extra selection is needed (or
+        # wanted) to create that separation; adding one only erodes it.
         started_app = status == "Enrolled"
         if status in ("Lost", "Visited"):
-            start_prob = 0.15
-            if r["cutoff"] >= 120:
-                start_prob += 0.20
-            if r["cutoff"] < 90:
-                start_prob -= 0.10
-            started_app = rng.random() < clip(start_prob, 0.0, 0.9)
+            started_app = rng.random() < 0.22
 
         if started_app:
             first, _, last = r["name"].partition(" ")
@@ -298,7 +312,21 @@ def generate(count, seed):
                 reviewed_at = joined.isoformat()
             else:
                 profile_date = min(now, r["created"] + timedelta(days=rng.randint(3, 20)))
-                stage = wpick(rng, DROPOUT_STAGES)
+                # How far they got before stalling tracks the same
+                # propensity p (higher p = closer to being admitted before
+                # it fell through), plus noise - not a flat random pick
+                # across DROPOUT_STAGES like the first version.
+                progress = clip(p + rng.gauss(0, 0.15), 0.0, 1.0)
+                if progress < 0.25:
+                    stage = "Draft"
+                elif progress < 0.5:
+                    stage = "Documents Submitted"
+                elif progress < 0.7:
+                    stage = "Fee Pending"
+                elif progress < 0.85:
+                    stage = "Verified"
+                else:
+                    stage = "Withdrawn"  # got furthest, then explicitly backed out
                 seat_type = None
                 reviewed_at = None if stage == "Draft" else min(
                     now, r["created"] + timedelta(days=rng.randint(10, 35))).isoformat()
