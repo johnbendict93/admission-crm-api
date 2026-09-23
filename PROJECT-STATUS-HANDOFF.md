@@ -215,9 +215,31 @@ Open items / caveats:
 - Migrations 0019 (fee_due_schedule) + 0020 (enquiry_monthly_history)
   applied to PROD 2026-09-23 — they were dev-only before, so the Fee Due
   Schedule page 500'd on the live site.
-- Demo plan (not started): second Render service on the DEV database
-  (ENVIRONMENT=development, DOCS_ENABLED=false, PROD_* set to dummy values)
-  so the public demo shows synthetic data; `DOCS_ENABLED` code is in `8f2311b`.
+- **NEXT SESSION: demo copy (John chose to do this next, ~20-30 min, no
+  code needed — `DOCS_ENABLED` is already in `8f2311b`).** Goal: a public
+  demo on the DEV database (534 synthetic leads) so prod stays clean.
+  Guide John one step at a time:
+  1. Render -> New -> Web Service -> same repo `admission-crm-api`, branch
+     `main`, free tier, Singapore. Copy Build/Start commands and Python
+     version (3.13.9, see `.python-version`) from the existing service's
+     Settings. Name e.g. `admission-crm-api-demo`.
+  2. Env vars (John pastes values himself from his local `.env`, never in
+     chat): `ENVIRONMENT=development`, `DOCS_ENABLED=false`,
+     `DEV_SUPABASE_URL`, `DEV_SUPABASE_KEY`, `DEV_SUPABASE_ANON_KEY`, and
+     `PROD_SUPABASE_URL=unused` / `PROD_SUPABASE_KEY=unused` (required
+     fields, dummies so the demo can never reach prod). Skip GROQ unless
+     needed.
+  3. Wait for "Your service is live"; check `<demo-url>/health` = 200 and
+     `<demo-url>/docs` = 404.
+  4. Vercel -> Add New -> Project -> import `Admission-CRM-Frontend` again
+     as a second project (e.g. `admission-crm-demo`),
+     `BACKEND_API_URL=<demo Render URL>` (no trailing slash).
+  5. Log in with the dev test account; spot-check Leads (534), AI Insights,
+     Dashboard.
+  6. Consider a VIEWER login for prospects (read-only role exists) so demo
+     visitors can't edit/delete the synthetic data.
+  Caveats to tell John: free Render sleeps (~50s first load); free
+  Supabase projects pause after ~1 week idle (click Restore before a demo).
 - ML models are trained on DEV synthetic data, so predictions on the prod
   site (esp. the demand forecast) reflect sample data, not prod.
 - Render free tier sleeps: first request after idle can take ~50s.
