@@ -143,6 +143,16 @@ def fee_payments_table():
 
 
 @pytest.fixture(scope="session")
+def fee_due_schedule_table():
+    return settings.FEE_DUE_SCHEDULE_TABLE
+
+
+@pytest.fixture(scope="session")
+def enquiry_monthly_history_table():
+    return settings.ENQUIRY_MONTHLY_HISTORY_TABLE
+
+
+@pytest.fixture(scope="session")
 def scholarships_table():
     return settings.SCHOLARSHIPS_TABLE
 
@@ -216,6 +226,8 @@ def verify_db_untouched(
     applicants_table,
     applications_table,
     fee_payments_table,
+    fee_due_schedule_table,
+    enquiry_monthly_history_table,
     scholarships_table,
     hostel_allotments_table,
     telecallers_table,
@@ -228,16 +240,24 @@ def verify_db_untouched(
     counseling_sessions_table,
 ):
     """Runs around every single test. Whatever a test does — including its
-    own try/finally cleanup of any row it created — the fourteen tables must
+    own try/finally cleanup of any row it created — the sixteen tables must
     have exactly the same row counts after the test as before it. This is
     the automated version of the manual "check row count before/after"
     step done for every prior live verification in this project.
+
+    fee_due_schedule_table/enquiry_monthly_history_table added alongside
+    the CRUD tests for those two tables (modules 18/20 prep) - every ML
+    endpoint test in this suite is read-only (GET only, no ML router has a
+    write path), so this guard would already catch a bug there too, but
+    these two are the ones a test actually creates/deletes rows in.
     """
     tables = [
         leads_table,
         applicants_table,
         applications_table,
         fee_payments_table,
+        fee_due_schedule_table,
+        enquiry_monthly_history_table,
         scholarships_table,
         hostel_allotments_table,
         telecallers_table,
@@ -281,4 +301,17 @@ def existing_application(supabase, applications_table):
     """A real, pre-existing application id — used for GET /{id) checks."""
     response = supabase.table(applications_table).select("id").is_("deleted_at", "null").limit(1).execute()
     assert response.data, "No existing applications found — seed data expected in 'applications'"
+    return response.data[0]["id"]
+
+
+@pytest.fixture
+def existing_fee_due_schedule(supabase, fee_due_schedule_table):
+    """A real, pre-existing fee_due_schedule id (from
+    scripts/seed_dev_fee_due_schedule.py's module-18 seed data) — used for
+    GET /{id} happy-path checks and for module 18's ML endpoint test."""
+    response = supabase.table(fee_due_schedule_table).select("id").is_("deleted_at", "null").limit(1).execute()
+    assert response.data, (
+        "No existing fee_due_schedule rows found — run "
+        "scripts/seed_dev_fee_due_schedule.py --apply first."
+    )
     return response.data[0]["id"]
