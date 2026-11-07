@@ -26,3 +26,7 @@ ml/eval/
 
 # Local-only backups of prod rows before cleanups (may contain data)
 _local_backups/
+
+# Local scratch (commit message drafts, pytest temp dirs)
+commit_msg*.txt
+pytest-cache-files-*/
