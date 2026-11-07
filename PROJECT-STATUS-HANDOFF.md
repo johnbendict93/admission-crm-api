@@ -194,52 +194,66 @@ that file): `ENVIRONMENT`, `DEV_SUPABASE_URL`/`DEV_SUPABASE_KEY`/
 - `ml/eval/` (ground-truth files with live dev row ids) is also
   gitignored, never committed.
 
-## Immediate next step
+## Current state (updated 7 Nov 2026)
 
-ML UI is done. Candidate next steps (John to choose):
-Everything is deployed (2026-09-23):
-- **Frontend live on Vercel:** https://admission-crm-frontend-fo7b.vercel.app
-  (Hobby plan, project `admission-crm-frontend-fo7b`, auto-deploys on push
-  to `master`; one env var `BACKEND_API_URL=https://admission-crm-api.onrender.com`).
-  Login + Dashboard verified live against PROD.
-- **Backend live on Render** with the fixed models.
+Everything below is live and pushed.
 
-Open items / caveats:
-- PROD sample-data cleanup (2026-09-23, John confirmed all were test rows
-  typed by hand): 55 rows hard-deleted (5 leads, 20 applicants, 15
-  applications, 1 followup, 1 call_schedule, 13 legacy `follow_ups`) via the
-  gitignored `check_prod_cleanup.py`; JSON backup on John's laptop in
-  `_local_backups/`. Config tables (users, settings, lookup_values,
-  document_types) kept. PROD is now empty of records. DEV untouched (534
-  synthetic leads etc.).
-- Migrations 0019 (fee_due_schedule) + 0020 (enquiry_monthly_history)
-  applied to PROD 2026-09-23 — they were dev-only before, so the Fee Due
-  Schedule page 500'd on the live site.
-- **NEXT SESSION: demo copy (John chose to do this next, ~20-30 min, no
-  code needed — `DOCS_ENABLED` is already in `8f2311b`).** Goal: a public
-  demo on the DEV database (534 synthetic leads) so prod stays clean.
-  Guide John one step at a time:
-  1. Render -> New -> Web Service -> same repo `admission-crm-api`, branch
-     `main`, free tier, Singapore. Copy Build/Start commands and Python
-     version (3.13.9, see `.python-version`) from the existing service's
-     Settings. Name e.g. `admission-crm-api-demo`.
-  2. Env vars (John pastes values himself from his local `.env`, never in
-     chat): `ENVIRONMENT=development`, `DOCS_ENABLED=false`,
-     `DEV_SUPABASE_URL`, `DEV_SUPABASE_KEY`, `DEV_SUPABASE_ANON_KEY`, and
-     `PROD_SUPABASE_URL=unused` / `PROD_SUPABASE_KEY=unused` (required
-     fields, dummies so the demo can never reach prod). Skip GROQ unless
-     needed.
-  3. Wait for "Your service is live"; check `<demo-url>/health` = 200 and
-     `<demo-url>/docs` = 404.
-  4. Vercel -> Add New -> Project -> import `Admission-CRM-Frontend` again
-     as a second project (e.g. `admission-crm-demo`),
-     `BACKEND_API_URL=<demo Render URL>` (no trailing slash).
-  5. Log in with the dev test account; spot-check Leads (534), AI Insights,
-     Dashboard.
-  6. Consider a VIEWER login for prospects (read-only role exists) so demo
-     visitors can't edit/delete the synthetic data.
-  Caveats to tell John: free Render sleeps (~50s first load); free
-  Supabase projects pause after ~1 week idle (click Restore before a demo).
-- ML models are trained on DEV synthetic data, so predictions on the prod
-  site (esp. the demand forecast) reflect sample data, not prod.
-- Render free tier sleeps: first request after idle can take ~50s.
+**Three deployments**
+- **Prod**: API `https://admission-crm-api.onrender.com` (Render, "My project ->
+  Production", service `admission-crm-api`) + site
+  `https://admission-crm-frontend-fo7b.vercel.app` (Vercel project
+  `admission-crm-frontend-fo7b`). Prod DB is empty of records by design.
+  The duplicate `-alpha` Vercel project was deleted 7 Nov.
+- **Demo** (for buyers): API `https://admission-crm-api-demo.onrender.com`
+  (Render service `admission-crm-api-demo`, ungrouped, `ENVIRONMENT=development`,
+  `DOCS_ENABLED=false`, `PROD_SUPABASE_URL/KEY=unused` as a safety lock) + site
+  `https://admission-crm-demo-tau.vercel.app` (Vercel `admission-crm-demo`,
+  `BACKEND_API_URL` = demo API). Uses the DEV database (528 synthetic leads).
+  Login: dev TEST_ADMIN account (display name "Demo Admin"); test-viewer is
+  the read-only account to hand to prospects.
+- Both Render APIs and both Vercel sites auto-deploy on push to main/master.
+
+**Done 7 Nov 2026**
+- Demo copy built (above). Dev `admission-crm-dev` Supabase had auto-paused
+  (free tier, ~1 week idle) - restored. Open the demo a day before any demo.
+- Dev cleanup: 6 junk leads + 3 junk applicants (and attached rows) soft-
+  deleted; Zz test users deactivated; 3 realistic staff added (Priya
+  Sundaram, Karthik Rajan - counselors; Divya Mohan - staff).
+- Frontend `10f7d0f`: Applicants "Assigned counselor" is a staff picker;
+  AI Insights hides enroll/call-time/telecaller predictions for Enrolled/Lost
+  leads; dev "Phase A+B+C+D" label removed.
+- ML `0dbfe82`: modules 13/14/17/21 now give per-lead answers.
+  `ml/features.py` adds telecaller x course and telecaller x occupation
+  interaction features; module 14 uses hour as categorical + parent
+  occupation (joined from leads) + hour x occupation, cv_scoring
+  neg_log_loss. Dev data given explainable patterns by
+  `scripts/enrich_dev_ml_patterns.py` (backup:
+  `_local_backups/enrich_dev_ml_patterns_20261107_143156.json`, `--undo`
+  restores). CV ROC-AUC: conversion 0.62 -> 0.756, timing -> 0.808.
+  The specialist effect is deliberately strong (48% vs 10% enrol) - tone
+  down SPECIALIST_IF_ENROLLED (0.75 -> ~0.6) and rerun if it looks too neat.
+- Groq key rotated ("Admission CRM Nov-2026"); updated in Streamlit Cloud,
+  GitHub secrets STREAMLIT_SECRETS_PROD and _DEV, local secrets.toml files;
+  old key revoked.
+- Streamlit app `admission-crm` confirmed private (repo kept: the daily
+  report runs from it). Report fixed in that repo (`806ec92`): real overdue
+  count (open leads whose latest follow-up is past due, no 1000-row cap),
+  deleted rows excluded, today's visits only, Lost row, AI summary is short
+  plain bullets with no placeholders.
+- Loose files archived to `docs/archive/` (`faea9d1`).
+- Customer setup guide: `docs/CUSTOMER-SETUP.md` (never run end-to-end yet -
+  do its Step 0 rehearsal before the first real customer).
+
+**Gotcha found 7 Nov:** plain `python` in John's PowerShell runs BASE
+Anaconda (scikit-learn 1.7.2), even after `conda activate`. Models trained
+with it break on Render (1.9.1). Always use
+`conda run -n admission-crm-api python ...` or the env's python.exe.
+
+**Still open**
+- Revoke the dev Gmail app password (do from phone: Google Account ->
+  Security -> App passwords; desktop sign-in hit a Google security delay).
+- Step 0 rehearsal of `docs/CUSTOMER-SETUP.md` with a throwaway project.
+- Daily report is wired to one database and lives in the Streamlit repo -
+  move it into this API before offering it per customer.
+- Render free tier sleeps (~50 s first load); free Supabase pauses after
+  ~1 week idle.
