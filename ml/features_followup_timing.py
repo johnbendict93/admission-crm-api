@@ -21,12 +21,21 @@ from typing import Optional
 
 import pandas as pd
 
-NUMERIC_FEATURES = ["hour"]
-CATEGORICAL_FEATURES = ["called_by"]
+# Revised Nov 2026. The first version used hour as a NUMERIC feature with
+# called_by only, so a logistic model could only learn "later is better" (a
+# straight line) - every lead got the same answer (8 PM). Now:
+#   * hour is CATEGORICAL ("09".."20"), so each hour gets its own weight;
+#   * parent_occupation comes from the lead (joined at training time), and
+#     the hour x occupation cross lets the model learn that, e.g., farming
+#     families pick up early while office workers pick up after 6 PM.
+# No numeric features left, so training passes cv_scoring="neg_log_loss"
+# (see ml/pipeline.py on why ROC-AUC degenerates for all-categorical models).
+NUMERIC_FEATURES: list[str] = []
+CATEGORICAL_FEATURES = ["hour", "called_by", "parent_occupation", "hour_x_occupation"]
 FEATURE_COLUMNS = NUMERIC_FEATURES + CATEGORICAL_FEATURES
 
-# Columns to SELECT from followups for training: features + the raw
-# response text the label is derived from + id for traceability/ordering.
+# Training query (ml/train_followup_timing_model.py) joins followups to
+# leads for parent_occupation - these are the followups-side columns.
 TRAINING_SELECT_COLUMNS = ["id", "call_time", "called_by", "response"]
 
 # Call-center hours candidate window for the "what time should I call this
@@ -58,14 +67,37 @@ def extract_hour(call_time: Optional[str]) -> Optional[int]:
     return hour if 0 <= hour <= 23 else None
 
 
+def _hour_label(hour) -> str:
+    return "Unknown" if hour is None else f"{int(hour):02d}"
+
+
+def build_frame(items: list[dict]) -> pd.DataFrame:
+    """items: dicts with hour (int or None), called_by, parent_occupation.
+    Shared by training (rows_to_frame) and inference (frame_for_lead) so
+    the two can never drift apart."""
+    df = pd.DataFrame(
+        [{"hour": _hour_label(i.get("hour")),
+          "called_by": i.get("called_by"),
+          "parent_occupation": i.get("parent_occupation")} for i in items],
+        columns=["hour", "called_by", "parent_occupation"],
+    )
+    for col in ("called_by", "parent_occupation"):
+        df[col] = df[col].fillna("Unknown").astype(str)
+    df["hour_x_occupation"] = df["hour"] + "|" + df["parent_occupation"]
+    return df[FEATURE_COLUMNS]
+
+
 def rows_to_frame(rows: list[dict]) -> pd.DataFrame:
-    """Raw DB rows (list of dicts) -> a DataFrame with exactly
-    FEATURE_COLUMNS, in order, ready for the pipeline's ColumnTransformer.
-    Missing called_by becomes "Unknown" (stable OneHotEncoder categories
-    between training and inference, same convention as ml/features.py).
-    Missing/unparseable hour is left as NaN - the pipeline's imputer
-    handles it."""
-    data = [{"hour": extract_hour(r.get("call_time")), "called_by": r.get("called_by")} for r in rows]
-    df = pd.DataFrame(data, columns=FEATURE_COLUMNS)
-    df["called_by"] = df["called_by"].fillna("Unknown").astype(str)
-    return df
+    """Training rows (followups joined to leads.parent_occupation) ->
+    DataFrame with exactly FEATURE_COLUMNS."""
+    return build_frame([{"hour": extract_hour(r.get("call_time")),
+                         "called_by": r.get("called_by"),
+                         "parent_occupation": r.get("parent_occupation")} for r in rows])
+
+
+def frame_for_lead(lead: dict) -> pd.DataFrame:
+    """One row per CANDIDATE_HOURS for this lead (its telecaller + parent
+    occupation) - what the best-time endpoint scores."""
+    return build_frame([{"hour": h,
+                         "called_by": lead.get("assigned_to"),
+                         "parent_occupation": lead.get("parent_occupation")} for h in CANDIDATE_HOURS])

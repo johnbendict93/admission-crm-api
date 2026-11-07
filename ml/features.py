@@ -11,12 +11,27 @@ import pandas as pd
 # excludes PII (name, phone, email, parent_name, parent_phone) and
 # id/status/created_at, which are identifiers or the label, not signal.
 NUMERIC_FEATURES = ["marks", "score"]
-CATEGORICAL_FEATURES = ["source", "district", "course_interest", "parent_occupation", "assigned_to"]
+BASE_CATEGORICAL_FEATURES = ["source", "district", "course_interest", "parent_occupation", "assigned_to"]
+
+# Derived "telecaller x lead" interaction features (added Nov 2026). Without
+# them a logistic model can only learn ONE fixed bonus per telecaller, the
+# same for every lead - so "best telecaller for this lead" (module 17) and
+# lead ranking always picked the same telecaller for everyone. Crossing the
+# telecaller with the lead's course and parent occupation lets the model
+# learn specialties ("B converts rural Mechanical leads well") while staying
+# a plain, explainable logistic regression. Built in rows_to_frame, never
+# stored in the DB.
+INTERACTION_FEATURES = {
+    "assigned_to_x_course": ("assigned_to", "course_interest"),
+    "assigned_to_x_occupation": ("assigned_to", "parent_occupation"),
+}
+CATEGORICAL_FEATURES = BASE_CATEGORICAL_FEATURES + list(INTERACTION_FEATURES)
 FEATURE_COLUMNS = NUMERIC_FEATURES + CATEGORICAL_FEATURES
 
-# Columns to SELECT from the leads table for training: features + the raw
-# status the label is derived from + id for traceability.
-TRAINING_SELECT_COLUMNS = FEATURE_COLUMNS + ["id", "status"]
+# Columns to SELECT from the leads table for training: real DB columns only
+# (the interaction features are derived) + the raw status the label is
+# derived from + id for traceability.
+TRAINING_SELECT_COLUMNS = NUMERIC_FEATURES + BASE_CATEGORICAL_FEATURES + ["id", "status"]
 
 # Module 13's positive class. See RESOLVED_STATUSES/filter_resolved below
 # for which rows this is actually evaluated against (revised 2026-09-22).
@@ -61,10 +76,12 @@ def rows_to_frame(rows: list[dict[str, Any]]) -> pd.DataFrame:
     training and inference. Missing numeric values are left as NaN - the
     pipeline's own imputer handles those (see train_conversion_model.py)."""
     df = pd.DataFrame(rows)
-    for col in FEATURE_COLUMNS:
+    for col in NUMERIC_FEATURES + BASE_CATEGORICAL_FEATURES:
         if col not in df.columns:
             df[col] = None
-    df = df[FEATURE_COLUMNS].copy()
-    for col in CATEGORICAL_FEATURES:
+    df = df[NUMERIC_FEATURES + BASE_CATEGORICAL_FEATURES].copy()
+    for col in BASE_CATEGORICAL_FEATURES:
         df[col] = df[col].fillna("Unknown").astype(str)
-    return df
+    for name, (a, b) in INTERACTION_FEATURES.items():
+        df[name] = df[a] + "|" + df[b]
+    return df[FEATURE_COLUMNS]

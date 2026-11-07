@@ -44,8 +44,15 @@ def load_dev_followups() -> list[dict]:
     conn = psycopg2.connect(settings.DEV_DATABASE_URL)
     conn.set_session(readonly=True, autocommit=True)
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    cols = ", ".join(TRAINING_SELECT_COLUMNS)
-    cur.execute(f"SELECT {cols} FROM public.followups ORDER BY id;")
+    cols = ", ".join(f"f.{c}" for c in TRAINING_SELECT_COLUMNS)
+    # Join to leads for parent_occupation (see ml/features_followup_timing.py);
+    # soft-deleted followups/leads are excluded.
+    cur.execute(
+        f"SELECT {cols}, l.parent_occupation FROM public.followups f "
+        f"LEFT JOIN public.leads l ON l.id = f.lead_id "
+        f"WHERE f.deleted_at IS NULL AND (l.id IS NULL OR l.deleted_at IS NULL) "
+        f"ORDER BY f.id;"
+    )
     rows = [dict(r) for r in cur.fetchall()]
     cur.close()
     conn.close()
@@ -68,7 +75,8 @@ def main() -> None:
                   f"for {CV_FOLDS}-fold stratified CV. Seed more followups first.")
 
     def make_this_pipeline():
-        return build_pipeline(numeric_features=NUMERIC_FEATURES, categorical_features=CATEGORICAL_FEATURES)
+        return build_pipeline(numeric_features=NUMERIC_FEATURES, categorical_features=CATEGORICAL_FEATURES,
+                              cv_scoring="neg_log_loss")
 
     skf = StratifiedKFold(n_splits=CV_FOLDS, shuffle=True, random_state=RANDOM_STATE)
     cv = cross_validate(make_this_pipeline(), X, y, cv=skf, scoring=CV_SCORING)

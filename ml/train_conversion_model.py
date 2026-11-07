@@ -63,7 +63,7 @@ def load_dev_leads() -> list[dict]:
     conn.set_session(readonly=True, autocommit=True)
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cols = ", ".join(TRAINING_SELECT_COLUMNS)
-    cur.execute(f"SELECT {cols} FROM public.leads WHERE email NOT LIKE 'fraud.%' ORDER BY id;")
+    cur.execute(f"SELECT {cols} FROM public.leads WHERE email NOT LIKE 'fraud.%' AND deleted_at IS NULL ORDER BY id;")
     rows = [dict(r) for r in cur.fetchall()]
     cur.close()
     conn.close()

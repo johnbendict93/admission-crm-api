@@ -6,7 +6,7 @@ import joblib
 import pandas as pd
 
 from app.core.config import settings
-from ml.features_followup_timing import CANDIDATE_HOURS, FEATURE_COLUMNS
+from ml.features_followup_timing import CANDIDATE_HOURS, frame_for_lead
 
 logger = logging.getLogger(__name__)
 
@@ -37,22 +37,14 @@ def get_followup_timing_model():
         raise ModelNotAvailableError(f"Model at {model_path} failed to load: {e}") from e
 
 
-def predict_best_followup_time(assigned_to: str | None) -> tuple[int, float, list[tuple[int, float]]]:
-    """assigned_to: the lead's leads.assigned_to (telecaller name), or None
-    if unassigned - the model was trained with "Unknown" standing in for a
-    missing/unseen telecaller (see rows_to_frame), so this still returns a
-    ranked list rather than erroring.
-
-    Scores every candidate hour (9am-8pm, see CANDIDATE_HOURS) for this one
-    telecaller and ranks them - this is a single small batch predict_proba
-    call, not one call per hour."""
+def predict_best_followup_time(lead: dict) -> tuple[int, float, list[tuple[int, float]]]:
+    """Scores every candidate hour (9am-8pm, CANDIDATE_HOURS) for THIS lead -
+    its assigned telecaller and its parent's occupation (Nov 2026: the hour
+    x occupation pattern is what makes the answer differ per lead) - and
+    ranks them. Missing values fall back to "Unknown", same as training.
+    One small batch predict_proba call, not one call per hour."""
     model = get_followup_timing_model()
-    frame = pd.DataFrame(
-        [{"hour": hour, "called_by": assigned_to} for hour in CANDIDATE_HOURS],
-        columns=FEATURE_COLUMNS,
-    )
-    frame["called_by"] = frame["called_by"].fillna("Unknown").astype(str)
-    probabilities = model.predict_proba(frame)[:, 1]
+    probabilities = model.predict_proba(frame_for_lead(lead))[:, 1]
     ranked = sorted(zip(CANDIDATE_HOURS, probabilities), key=lambda pair: -pair[1])
     best_hour, best_probability = ranked[0]
     return int(best_hour), float(best_probability), [(int(h), float(p)) for h, p in ranked]

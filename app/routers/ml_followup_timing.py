@@ -18,8 +18,8 @@ def get_best_followup_time(
     supabase: Client = Depends(get_supabase_client),
     current_user: dict = Depends(get_current_user),
 ):
-    """Ranks candidate calling hours (9am-8pm) for this lead's assigned
-    telecaller by predicted probability of a positive response (roadmap
+    """Ranks candidate calling hours (9am-8pm) for this lead - its assigned
+    telecaller and parent's occupation - by predicted probability of a positive response (roadmap
     module 14 - see ml/train_followup_timing_model.py for the model
     itself). Read-only: never writes anything back to the lead."""
     try:
@@ -30,7 +30,7 @@ def get_best_followup_time(
         raise HTTPException(status_code=404, detail="Lead not found")
 
     try:
-        best_hour, best_probability, ranked = predict_best_followup_time(lead.get("assigned_to"))
+        best_hour, best_probability, ranked = predict_best_followup_time(lead)
     except ModelNotAvailableError as e:
         raise HTTPException(status_code=503, detail=str(e))
 
